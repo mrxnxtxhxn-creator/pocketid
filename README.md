@@ -27,7 +27,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen font-sans p-4">
 
-    <div class="w-full max-w-2xl bg-white rounded-lg shadow-xl p-6 space-y-6">
+    <div class="w-full max-w-4xl bg-white rounded-lg shadow-xl p-6 space-y-6">
         <h1 class="text-3xl font-bold text-center text-gray-800">Scanner de ID</h1>
 
         <!-- Área de entrada para a lista de IDs -->
@@ -201,3 +201,4 @@
     </script>
 </body>
 </html>
+
