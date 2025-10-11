@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Scanner de ID</title>
+    <title>Scanner de ID Rápido</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- NOVA BIBLIOTECA DE SCANNER - MAIS ESTÁVEL -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         body, html {
@@ -26,7 +25,6 @@
             height: 100% !important;
             object-fit: cover !important;
         }
-        /* Estilo da janela de scan customizada */
         #reader__scan_region {
             border: 4px solid rgba(255, 255, 255, 0.7) !important;
             border-radius: 16px;
@@ -64,7 +62,7 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.25s ease-in-out;
+            transition: opacity 0.20s ease-in-out; /* Transição mais rápida */
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             font-size: 1.8rem; color: white; font-weight: bold;
@@ -74,11 +72,8 @@
     </style>
 </head>
 <body>
-    <!-- O leitor da nova biblioteca será renderizado aqui -->
     <div id="reader"></div>
-
     <div id="feedback-overlay"></div>
-
     <div id="controls-panel">
         <div class="w-full max-w-lg mx-auto">
             <label for="id-list-input" class="block text-sm font-medium text-gray-200 mb-2 text-center">IDs para procurar (separados por vírgula):</label>
@@ -93,7 +88,8 @@
             
             let validIds = new Set();
             let isPaused = false;
-            const SCAN_DELAY = 2500;
+            // --- MODIFICAÇÃO: Tempo de feedback reduzido para 1 segundo ---
+            const SCAN_DELAY = 1000;
 
             function updateIdList() {
                 const idsText = idListInput.value.trim();
@@ -109,7 +105,10 @@
                 feedbackOverlay.innerHTML = `<div style="font-size: 2.5rem;">${message}</div><div style="font-size: 1.2rem; margin-top: 8px;">${scannedId}</div>`;
                 feedbackOverlay.style.opacity = '1';
                 
-                if (status === 'success' && navigator.vibrate) navigator.vibrate(150);
+                // --- MODIFICAÇÃO: Vibração de 200ms em caso de sucesso ---
+                if (status === 'success' && navigator.vibrate) {
+                    navigator.vibrate(200);
+                }
 
                 setTimeout(() => {
                     feedbackOverlay.style.opacity = '0';
@@ -117,11 +116,8 @@
                 }, SCAN_DELAY);
             }
 
-            // --- LÓGICA DO NOVO SCANNER ---
-
             const html5QrCode = new Html5Qrcode("reader");
 
-            // Callback de sucesso da leitura
             const onScanSuccess = (decodedText, decodedResult) => {
                 if (isPaused) {
                     return;
@@ -134,32 +130,27 @@
                 }
             };
 
-            // Callback de falha (ignora erros de "código não encontrado")
             const onScanFailure = (error) => {
-                // Não faz nada, a biblioteca continua tentando ler.
+                // Não faz nada
             };
 
-            // Configurações do scanner
             const config = {
-                fps: 10, // Quadros por segundo para analisar
+                fps: 10,
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdge * 0.7); // A janela de scan será 70% do menor lado da tela
+                    const qrboxSize = Math.floor(minEdge * 0.7);
                     return {
                         width: qrboxSize,
-                        height: qrboxSize * 0.6 // Retângulo
+                        height: qrboxSize * 0.6
                     };
                 },
-                supportedScanTypes: [
-                    Html5QrcodeScanType.SCAN_TYPE_CAMERA
-                ],
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
                 formatsToSupport: [ 
                     Html5QrcodeSupportedFormats.CODE_128,
                     Html5QrcodeSupportedFormats.EAN_13
                 ]
             };
 
-            // Inicia o scanner
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
                 .catch(err => {
                     console.error("Não foi possível iniciar o leitor de QR code.", err);
@@ -171,4 +162,3 @@
     </script>
 </body>
 </html>
-
