@@ -103,7 +103,7 @@
             let idsToFind = new Set();
             let foundIds = new Set();
             let isPaused = false;
-            const SCAN_DELAY = 1000;
+            const SCAN_DELAY = 800;
             let audioContext;
 
             function initAudio() {
@@ -119,11 +119,14 @@
                 oscillator.connect(gainNode); gainNode.connect(audioContext.destination);
                 gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                 if (type === 'success') {
-                    oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(1200, audioContext.currentTime); // Tom agudo
                     oscillator.type = 'sine';
-                } else {
-                    oscillator.frequency.setValueAtTime(180, audioContext.currentTime);
+                } else if (type === 'error') {
+                    oscillator.frequency.setValueAtTime(180, audioContext.currentTime); // Tom grave
                     oscillator.type = 'square';
+                } else { // warning
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // Tom neutro
+                    oscillator.type = 'triangle';
                 }
                 oscillator.start(audioContext.currentTime);
                 oscillator.stop(audioContext.currentTime + 0.12);
@@ -156,7 +159,15 @@
                 feedbackOverlay.style.opacity = '1';
                 
                 playSound(status);
-                if (status === 'success' && navigator.vibrate) navigator.vibrate(150);
+                // --- MODIFICAÇÃO: Sistema de vibração diferenciado ---
+                if (navigator.vibrate) {
+                    if (status === 'success') {
+                        navigator.vibrate(200); // Vibração curta e forte
+                    } else if (status === 'error') {
+                        navigator.vibrate([100, 50, 100]); // Duas vibrações curtas
+                    }
+                    // Nenhum 'else' para o status 'warning', portanto não vibra
+                }
 
                 setTimeout(() => {
                     feedbackOverlay.style.opacity = '0';
@@ -185,7 +196,7 @@
 
                 if (idsToFind.has(scannedId)) {
                     showFeedback('success', scannedId);
-                    idsToFind.delete(scannedId); // Sai da lista de procura
+                    idsToFind.delete(scannedId);
                     foundIds.add(scannedId);
                     updateFoundListUI();
                 } else if (foundIds.has(scannedId)) {
@@ -196,8 +207,8 @@
             };
 
             const config = {
-                fps: 10,
-                qrbox: (w, h) => { const s = Math.min(w, h) * 0.7; return { width: s, height: s * 0.5 }; },
+                fps: 15,
+                qrbox: (w, h) => { const s = Math.min(w, h) * 0.8; return { width: s, height: s * 0.5 }; },
                 supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
                 formatsToSupport: [ 
                     Html5QrcodeSupportedFormats.CODE_128,
