@@ -57,7 +57,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             let appState = {
                 idsToFind: new Set(),
-                foundIds: [],
+                foundIds: [], 
                 isPaused: false,
                 audioContext: null,
                 html5QrCode: null
@@ -76,6 +76,10 @@
             function handleFileSelect(event) {
                 const file = event.target.files[0];
                 if (!file) return;
+                if (!file.type.match('text.*')) {
+                    alert("Formato de ficheiro inválido. Por favor, selecione um ficheiro .txt ou .csv.");
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const text = e.target.result;
@@ -112,12 +116,11 @@
                 appState.html5QrCode = new Html5Qrcode("reader");
                 const config = {
                     fps: 15,
-                    // --- MODIFICAÇÃO: Área de leitura maior ---
                     qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const width = Math.floor(viewfinderWidth * 0.9); // Usa 90% da largura do ecrã
+                        const width = Math.floor(viewfinderWidth * 0.9);
                         return {
                             width: width,
-                            height: Math.floor(width * 0.4) // Retângulo mais largo, ideal para códigos de barras
+                            height: Math.floor(width * 0.4) 
                         };
                     }
                 };
@@ -156,7 +159,7 @@
                 const message = messageOverride || (status === 'success' ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
                 const feedbackOverlay = document.getElementById('feedback-overlay');
                 feedbackOverlay.style.background = status === 'success' ? 'radial-gradient(circle, rgba(34, 197, 94, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : (status === 'warning' ? 'radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : 'radial-gradient(circle, rgba(239, 68, 68, 0.8) 0%, rgba(30, 41, 59, 0) 70%)');
-                feedbackOverlay.innerHTML = `<div class="feedback-pulse text-6xl">${message}</div><div class="feedback-pulse text-2xl mt-4 font-mono">${scannedId}</div>`;
+                feedbackOverlay.innerHTML = `<div class="feedback-pulse p-4 text-6xl">${message}</div><div class="feedback-pulse text-2xl mt-4 font-mono p-2 bg-black/30 rounded-lg">${scannedId}</div>`;
                 feedbackOverlay.style.opacity = '1';
                 playSound(status);
                 if (navigator.vibrate) {
@@ -190,10 +193,10 @@
                 const gain = appState.audioContext.createGain();
                 osc.connect(gain); gain.connect(appState.audioContext.destination);
                 gain.gain.setValueAtTime(0.3, appState.audioContext.currentTime);
-                if (type === 'success') { osc.frequency.setValueAtTime(1200, audioContext.currentTime); } 
-                else if (type === 'error') { osc.frequency.setValueAtTime(180, audioContext.currentTime); osc.type = 'square'; } 
-                else { osc.frequency.setValueAtTime(600, audioContext.currentTime); osc.type = 'triangle'; }
-                osc.start(); osc.stop(appState.audioContext.currentTime + 0.12);
+                if (type === 'success') { osc.frequency.setValueAtTime(1200, osc.context.currentTime); } 
+                else if (type === 'error') { osc.frequency.setValueAtTime(180, osc.context.currentTime); osc.type = 'square'; } 
+                else { osc.frequency.setValueAtTime(600, osc.context.currentTime); osc.type = 'triangle'; }
+                osc.start(); osc.stop(osc.context.currentTime + 0.12);
             }
             
             initialize();
