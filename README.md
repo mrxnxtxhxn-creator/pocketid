@@ -6,6 +6,8 @@
     <title>Scanner de ID Profissional</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- NOVA BIBLIOTECA para ler ficheiros Excel (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -34,11 +36,12 @@
             </div>
             
             <div id="view-procurar" class="text-center">
-                <p class="text-sm text-slate-400 mb-4">Carregue um ficheiro .txt ou .csv com a sua lista de IDs (um por linha).</p>
+                <p class="text-sm text-slate-400 mb-4">Carregue um ficheiro (.txt, .csv, ou .xlsx) com a sua lista de IDs.</p>
                 <button id="load-file-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-5 rounded-lg shadow-lg text-lg">
                     Carregar Ficheiro de IDs
                 </button>
-                <input type="file" id="file-input" class="hidden" accept=".txt,.csv">
+                <!-- MODIFICAÇÃO: Aceita mais tipos de ficheiro -->
+                <input type="file" id="file-input" class="hidden" accept=".txt,.csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
                 <p id="file-info" class="text-xs text-green-400 mt-2 h-4"></p>
             </div>
 
@@ -76,20 +79,36 @@
             function handleFileSelect(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-                if (!file.type.match('text.*')) {
-                    alert("Formato de ficheiro inválido. Por favor, selecione um ficheiro .txt ou .csv.");
-                    return;
-                }
+
                 const reader = new FileReader();
-                reader.onload = (e) => {
-                    const text = e.target.result;
-                    const ids = text.trim().split(/[\n\r,]+/).map(id => id.trim()).filter(id => id);
-                    appState.idsToFind = new Set(ids);
-                    appState.foundIds = [];
-                    document.getElementById('file-info').textContent = `Ficheiro "${file.name}" carregado com ${ids.length} IDs.`;
-                    updateFoundListUI();
-                };
-                reader.readAsText(file);
+
+                if (file.name.endsWith('.xlsx')) {
+                    reader.onload = (e) => {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        // Converte a primeira coluna para uma lista de IDs
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        const ids = json.map(row => row[0]).filter(id => id).map(String);
+                        processIds(ids, file.name);
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else { // Para .txt e .csv
+                    reader.onload = (e) => {
+                        const text = e.target.result;
+                        const ids = text.trim().split(/[\n\r,]+/).map(id => id.trim()).filter(id => id);
+                        processIds(ids, file.name);
+                    };
+                    reader.readAsText(file);
+                }
+            }
+            
+            function processIds(ids, fileName) {
+                 appState.idsToFind = new Set(ids);
+                 appState.foundIds = [];
+                 document.getElementById('file-info').textContent = `Ficheiro "${fileName}" carregado com ${ids.length} IDs.`;
+                 updateFoundListUI();
             }
 
             function exportFoundIds() {
@@ -116,13 +135,7 @@
                 appState.html5QrCode = new Html5Qrcode("reader");
                 const config = {
                     fps: 15,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const width = Math.floor(viewfinderWidth * 0.9);
-                        return {
-                            width: width,
-                            height: Math.floor(width * 0.4) 
-                        };
-                    }
+                    qrbox: (w, h) => { const s = Math.min(w, h) * 0.9; return { width: s, height: s * 0.4 }; }
                 };
                 appState.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleScan(decodedText))
                     .catch(err => alert("ERRO AO INICIAR A CÂMARA: Por favor, verifique se deu permissão de acesso à câmara."));
@@ -159,7 +172,7 @@
                 const message = messageOverride || (status === 'success' ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
                 const feedbackOverlay = document.getElementById('feedback-overlay');
                 feedbackOverlay.style.background = status === 'success' ? 'radial-gradient(circle, rgba(34, 197, 94, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : (status === 'warning' ? 'radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : 'radial-gradient(circle, rgba(239, 68, 68, 0.8) 0%, rgba(30, 41, 59, 0) 70%)');
-                feedbackOverlay.innerHTML = `<div class="feedback-pulse p-4 text-6xl">${message}</div><div class="feedback-pulse text-2xl mt-4 font-mono p-2 bg-black/30 rounded-lg">${scannedId}</div>`;
+                feedbackOverlay.innerHTML = `<div class="feedback-pulse text-6xl">${message}</div><div class="feedback-pulse text-2xl mt-4 font-mono">${scannedId}</div>`;
                 feedbackOverlay.style.opacity = '1';
                 playSound(status);
                 if (navigator.vibrate) {
@@ -193,10 +206,10 @@
                 const gain = appState.audioContext.createGain();
                 osc.connect(gain); gain.connect(appState.audioContext.destination);
                 gain.gain.setValueAtTime(0.3, appState.audioContext.currentTime);
-                if (type === 'success') { osc.frequency.setValueAtTime(1200, osc.context.currentTime); } 
-                else if (type === 'error') { osc.frequency.setValueAtTime(180, osc.context.currentTime); osc.type = 'square'; } 
-                else { osc.frequency.setValueAtTime(600, osc.context.currentTime); osc.type = 'triangle'; }
-                osc.start(); osc.stop(osc.context.currentTime + 0.12);
+                if (type === 'success') { osc.frequency.setValueAtTime(1200, audioContext.currentTime); } 
+                else if (type === 'error') { osc.frequency.setValueAtTime(180, audioContext.currentTime); osc.type = 'square'; } 
+                else { osc.frequency.setValueAtTime(600, audioContext.currentTime); osc.type = 'triangle'; }
+                osc.start(); osc.stop(audioContext.currentTime + 0.12);
             }
             
             initialize();
