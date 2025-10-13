@@ -6,7 +6,6 @@
     <title>Scanner de ID Profissional</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <!-- NOVA BIBLIOTECA para ler ficheiros Excel (.xlsx) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,7 +25,7 @@
 </head>
 <body class="text-slate-200">
     <div id="reader" class="fixed top-0 left-0 w-full h-full z-1"><div class="scan-line"></div></div>
-    <div id="feedback-overlay" class="fixed inset-0 z-50 flex items-center justify-center text-white font-black opacity-0 pointer-events-none transition-opacity duration-200"></div>
+    <div id="feedback-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 text-white font-black opacity-0 pointer-events-none transition-opacity duration-200"></div>
 
     <div id="controls-panel" class="fixed bottom-0 left-0 right-0 z-10 p-4 border-t-0 rounded-t-2xl">
         <div class="w-full max-w-lg mx-auto">
@@ -40,7 +39,6 @@
                 <button id="load-file-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-5 rounded-lg shadow-lg text-lg">
                     Carregar Ficheiro de IDs
                 </button>
-                <!-- MODIFICAÇÃO: Aceita mais tipos de ficheiro -->
                 <input type="file" id="file-input" class="hidden" accept=".txt,.csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
                 <p id="file-info" class="text-xs text-green-400 mt-2 h-4"></p>
             </div>
@@ -79,22 +77,19 @@
             function handleFileSelect(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
-
                 if (file.name.endsWith('.xlsx')) {
                     reader.onload = (e) => {
                         const data = new Uint8Array(e.target.result);
                         const workbook = XLSX.read(data, {type: 'array'});
                         const firstSheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[firstSheetName];
-                        // Converte a primeira coluna para uma lista de IDs
                         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        const ids = json.map(row => row[0]).filter(id => id).map(String);
+                        const ids = json.map(row => String(row[0])).filter(id => id);
                         processIds(ids, file.name);
                     };
                     reader.readAsArrayBuffer(file);
-                } else { // Para .txt e .csv
+                } else {
                     reader.onload = (e) => {
                         const text = e.target.result;
                         const ids = text.trim().split(/[\n\r,]+/).map(id => id.trim()).filter(id => id);
@@ -112,10 +107,7 @@
             }
 
             function exportFoundIds() {
-                if (appState.foundIds.length === 0) {
-                    alert("Nenhum ID foi encontrado para exportar.");
-                    return;
-                }
+                if (appState.foundIds.length === 0) { alert("Nenhum ID foi encontrado para exportar."); return; }
                 let csvContent = "data:text/csv;charset=utf-8,ID_Encontrado,Data_Verificacao,Hora_Verificacao\n";
                 appState.foundIds.forEach(item => {
                     const row = [item.id, item.timestamp.toLocaleDateString('pt-BR'), item.timestamp.toLocaleTimeString('pt-BR')].join(',');
@@ -135,7 +127,10 @@
                 appState.html5QrCode = new Html5Qrcode("reader");
                 const config = {
                     fps: 15,
-                    qrbox: (w, h) => { const s = Math.min(w, h) * 0.9; return { width: s, height: s * 0.4 }; }
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8); // 80% do menor lado
+                        return { width: size, height: size }; // Retorna um quadrado
+                    }
                 };
                 appState.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleScan(decodedText))
                     .catch(err => alert("ERRO AO INICIAR A CÂMARA: Por favor, verifique se deu permissão de acesso à câmara."));
@@ -172,7 +167,7 @@
                 const message = messageOverride || (status === 'success' ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
                 const feedbackOverlay = document.getElementById('feedback-overlay');
                 feedbackOverlay.style.background = status === 'success' ? 'radial-gradient(circle, rgba(34, 197, 94, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : (status === 'warning' ? 'radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : 'radial-gradient(circle, rgba(239, 68, 68, 0.8) 0%, rgba(30, 41, 59, 0) 70%)');
-                feedbackOverlay.innerHTML = `<div class="feedback-pulse text-6xl">${message}</div><div class="feedback-pulse text-2xl mt-4 font-mono">${scannedId}</div>`;
+                feedbackOverlay.innerHTML = `<div class="feedback-pulse text-center"><div class="text-6xl">${message}</div><div class="text-2xl mt-4 font-mono p-2 bg-black/30 rounded-lg">${scannedId}</div></div>`;
                 feedbackOverlay.style.opacity = '1';
                 playSound(status);
                 if (navigator.vibrate) {
@@ -206,10 +201,10 @@
                 const gain = appState.audioContext.createGain();
                 osc.connect(gain); gain.connect(appState.audioContext.destination);
                 gain.gain.setValueAtTime(0.3, appState.audioContext.currentTime);
-                if (type === 'success') { osc.frequency.setValueAtTime(1200, audioContext.currentTime); } 
-                else if (type === 'error') { osc.frequency.setValueAtTime(180, audioContext.currentTime); osc.type = 'square'; } 
-                else { osc.frequency.setValueAtTime(600, audioContext.currentTime); osc.type = 'triangle'; }
-                osc.start(); osc.stop(audioContext.currentTime + 0.12);
+                if (type === 'success') { osc.frequency.setValueAtTime(1200, osc.context.currentTime); } 
+                else if (type === 'error') { osc.frequency.setValueAtTime(180, osc.context.currentTime); osc.type = 'square'; } 
+                else { osc.frequency.setValueAtTime(600, osc.context.currentTime); osc.type = 'triangle'; }
+                osc.start(); osc.stop(osc.context.currentTime + 0.12);
             }
             
             initialize();
