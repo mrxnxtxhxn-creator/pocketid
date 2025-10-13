@@ -172,13 +172,20 @@
 
             function startScanner() {
                 appState.html5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 15, qrbox: (w, h) => { const s = Math.min(w, h) * 0.8; return { width: s, height: s }; } };
+                const config = {
+                    fps: 15,
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
+                        return { width: size, height: size };
+                    }
+                };
                 appState.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => processScan(decodedText))
                     .catch(err => alert("ERRO AO INICIAR A CÂMARA: Por favor, verifique se deu permissão de acesso à câmara."));
             }
             
             function processScan(scannedId) {
                 if (appState.isPaused) return;
+                
                 if (appState.idsToFind.has(scannedId)) {
                     showFeedback('success', scannedId);
                     appState.idsToFind.delete(scannedId);
@@ -216,8 +223,11 @@
                     let totalDiff = 0;
                     for (let i = 1; i < lastScans.length; i++) totalDiff += (lastScans[i] - lastScans[i-1]);
                     const avgTime = (totalDiff / (lastScans.length - 1)) / 1000;
-                    document.getElementById('kpi-avg-time').textContent = `${avgTime.toFixed(1)} s`;
-                    document.getElementById('kpi-bpm').textContent = Math.round(60 / avgTime);
+                    if (!isNaN(avgTime)) {
+                        document.getElementById('kpi-avg-time').textContent = `${avgTime.toFixed(1)} s`;
+                        const bpm = avgTime > 0 ? Math.round(60 / avgTime) : '--';
+                        document.getElementById('kpi-bpm').textContent = bpm;
+                    }
                 }
             }
 
@@ -230,7 +240,23 @@
                 });
             }
 
-            function showFeedback(status, scannedId, messageOverride) { /* ...código da versão anterior... */ }
+            function showFeedback(status, scannedId, messageOverride) {
+                appState.isPaused = true;
+                const message = messageOverride || (status === 'success' ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+                const feedbackOverlay = document.getElementById('feedback-overlay');
+                feedbackOverlay.style.background = status === 'success' ? 'radial-gradient(circle, rgba(34, 197, 94, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : (status === 'warning' ? 'radial-gradient(circle, rgba(245, 158, 11, 0.8) 0%, rgba(30, 41, 59, 0) 70%)' : 'radial-gradient(circle, rgba(239, 68, 68, 0.8) 0%, rgba(30, 41, 59, 0) 70%)');
+                feedbackOverlay.innerHTML = `<div class="feedback-pulse text-center"><div class="text-6xl">${message}</div><div class="text-2xl mt-4 font-mono p-2 bg-black/30 rounded-lg">${scannedId}</div></div>`;
+                feedbackOverlay.style.opacity = '1';
+                playSound(status);
+                if (navigator.vibrate) {
+                    if (status === 'success') navigator.vibrate(200);
+                    else if (status === 'error') navigator.vibrate([100, 50, 100]);
+                }
+                setTimeout(() => {
+                    feedbackOverlay.style.opacity = '0';
+                    appState.isPaused = false;
+                }, SCAN_DELAY);
+            }
             
             function setupTabs() {
                 const tabs = ['procurar', 'encontrados', 'dashboard'];
@@ -248,8 +274,18 @@
                 });
             }
 
-            function initAudio() { /* ...código da versão anterior... */ }
-            function playSound(type) { /* ...código da versão anterior... */ }
+            function initAudio() { if (!appState.audioContext) appState.audioContext = new (window.AudioContext || window.webkitAudioContext)(); }
+            function playSound(type) {
+                if (!appState.audioContext) return;
+                const osc = appState.audioContext.createOscillator();
+                const gain = appState.audioContext.createGain();
+                osc.connect(gain); gain.connect(appState.audioContext.destination);
+                gain.gain.setValueAtTime(0.3, appState.audioContext.currentTime);
+                if (type === 'success') { osc.frequency.setValueAtTime(1200, osc.context.currentTime); } 
+                else if (type === 'error') { osc.frequency.setValueAtTime(180, osc.context.currentTime); osc.type = 'square'; } 
+                else { osc.frequency.setValueAtTime(600, osc.context.currentTime); osc.type = 'triangle'; }
+                osc.start(); osc.stop(osc.context.currentTime + 0.12);
+            }
             
             initialize();
         });
