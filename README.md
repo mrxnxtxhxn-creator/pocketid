@@ -7,15 +7,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
         #reader__scan_region { border: 4px solid rgba(255, 255, 255, 0.5) !important; border-radius: 1.5rem; background: none !important; box-shadow: 0 0 20px rgba(0, 255, 255, 0.3); }
         .scan-line { position: absolute; left: 5%; top: 10px; width: 90%; height: 4px; background: linear-gradient(to right, transparent, #06b6d4, transparent); box-shadow: 0 0 15px #06b6d4, 0 0 5px #fff; border-radius: 4px; animation: scan-animation 2.5s infinite ease-in-out; }
         @keyframes scan-animation { 0% { transform: translateY(0); } 50% { transform: translateY(calc(100% - 20px)); } 100% { transform: translateY(0); } }
-        #controls-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border-top: 1px solid rgba(71, 85, 105, 0.5); }
+        #controls-panel { 
+            background: rgba(30, 41, 59, 0.8); 
+            backdrop-filter: blur(16px); 
+            border-top: 1px solid rgba(71, 85, 105, 0.5);
+            transform: translateY(calc(100% - 70px)); /* Começa recolhido */
+            transition: transform 0.3s ease-in-out;
+        }
+        #controls-panel.open {
+            transform: translateY(0);
+        }
         .feedback-pulse { animation: pulse-feedback 0.8s ease-out; }
         @keyframes pulse-feedback { from { transform: scale(0.9); opacity: 0.7; } to { transform: scale(1); opacity: 1; } }
         .tab-btn { border-bottom: 3px solid transparent; transition: all 0.2s; }
@@ -27,13 +34,15 @@
     <div id="reader" class="fixed top-0 left-0 w-full h-full z-1"><div class="scan-line"></div></div>
     <div id="feedback-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 text-white font-black opacity-0 pointer-events-none transition-opacity duration-200"></div>
 
-    <div id="controls-panel" class="fixed bottom-0 left-0 right-0 z-10 p-4 border-t-0 rounded-t-2xl">
-        <div class="w-full max-w-lg mx-auto">
+    <div id="controls-panel" class="fixed bottom-0 left-0 right-0 z-10 rounded-t-2xl">
+        <div id="panel-handle" class="w-full h-10 flex justify-center items-center cursor-pointer">
+             <div class="w-10 h-1.5 bg-slate-500 rounded-full"></div>
+        </div>
+        <div class="w-full max-w-lg mx-auto px-4 pb-4">
             <div class="flex justify-center mb-4 space-x-4">
-                <button id="tab-procurar" class="tab-btn tab-active py-3 px-4 font-semibold">Procurar</button>
-                <button id="tab-encontrados" class="tab-btn tab-inactive py-3 px-4 font-semibold">Encontrados (<span id="found-count">0</span>)</button>
+                <button id="tab-procurar" class="tab-btn tab-active py-2 px-4 font-semibold">Procurar</button>
+                <button id="tab-encontrados" class="tab-btn tab-inactive py-2 px-4 font-semibold">Encontrados (<span id="found-count">0</span>)</button>
             </div>
-            
             <div id="view-procurar" class="text-center">
                 <p class="text-sm text-slate-400 mb-4">Carregue um ficheiro (.txt, .csv, ou .xlsx) com a sua lista de IDs.</p>
                 <button id="load-file-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-5 rounded-lg shadow-lg text-lg">
@@ -42,7 +51,6 @@
                 <input type="file" id="file-input" class="hidden" accept=".txt,.csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
                 <p id="file-info" class="text-xs text-green-400 mt-2 h-4"></p>
             </div>
-
             <div id="view-encontrados" class="hidden">
                 <button id="export-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-lg mb-4">
                     Exportar para Excel (.csv)
@@ -65,6 +73,31 @@
             };
             const SCAN_DELAY = 800;
 
+            const controlsPanel = document.getElementById('controls-panel');
+            const panelHandle = document.getElementById('panel-handle');
+
+            const togglePanel = () => controlsPanel.classList.toggle('open');
+            panelHandle.addEventListener('click', togglePanel);
+            
+            // Lógica de swipe (simplificada)
+            let touchStartY = 0;
+            document.addEventListener('touchstart', e => {
+                if (e.target === panelHandle || controlsPanel.contains(e.target)) {
+                    touchStartY = e.touches[0].clientY;
+                }
+            });
+            document.addEventListener('touchend', e => {
+                if (touchStartY === 0) return;
+                const touchEndY = e.changedTouches[0].clientY;
+                if (touchStartY - touchEndY > 50) { // Swipe para cima
+                    controlsPanel.classList.add('open');
+                } else if (touchEndY - touchStartY > 50) { // Swipe para baixo
+                    controlsPanel.classList.remove('open');
+                }
+                touchStartY = 0;
+            });
+
+
             function initialize() {
                 document.getElementById('load-file-btn').addEventListener('click', () => document.getElementById('file-input').click());
                 document.getElementById('file-input').addEventListener('change', handleFileSelect);
@@ -85,7 +118,7 @@
                         const firstSheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[firstSheetName];
                         const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        const ids = json.map(row => String(row[0])).filter(id => id);
+                        const ids = json.map(row => String(row[0])).filter(id => id && id !== 'undefined');
                         processIds(ids, file.name);
                     };
                     reader.readAsArrayBuffer(file);
@@ -128,8 +161,8 @@
                 const config = {
                     fps: 15,
                     qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8); // 80% do menor lado
-                        return { width: size, height: size }; // Retorna um quadrado
+                        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
+                        return { width: size, height: size };
                     }
                 };
                 appState.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleScan(decodedText))
