@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Scanner de ID Profissional</title>
+    <title>Scanner de ID com Módulo de Inventário</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -38,14 +38,16 @@
              <div class="w-10 h-1.5 bg-slate-500 rounded-full"></div>
         </div>
         <div class="w-full max-w-lg mx-auto px-4 pb-4">
-            <div class="flex justify-center mb-4 space-x-4">
-                <button id="tab-procurar" class="tab-btn tab-active py-2 px-4 font-semibold">Procurar</button>
-                <button id="tab-encontrados" class="tab-btn tab-inactive py-2 px-4 font-semibold">Encontrados (<span id="found-count">0</span>)</button>
-                <button id="tab-dashboard" class="tab-btn tab-inactive py-2 px-4 font-semibold">Dashboard</button>
+            <div class="flex justify-center mb-4 space-x-2 sm:space-x-4">
+                <button data-view="procurar" class="tab-btn tab-active py-2 px-4 font-semibold text-sm sm:text-base">Procurar</button>
+                <button data-view="encontrados" class="tab-btn tab-inactive py-2 px-4 font-semibold text-sm sm:text-base">Encontrados (<span id="found-count">0</span>)</button>
+                <button data-view="dashboard" class="tab-btn tab-inactive py-2 px-4 font-semibold text-sm sm:text-base">Dashboard</button>
+                <button data-view="inventario" class="tab-btn tab-inactive py-2 px-4 font-semibold text-sm sm:text-base">Inventário</button>
             </div>
-            <div id="view-procurar" class="text-center">
-                <button id="load-file-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-5 rounded-lg shadow-lg text-lg">Carregar Ficheiro de IDs</button>
-                <input type="file" id="file-input" class="hidden" accept=".txt,.csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+            
+            <div data-view-content="procurar" class="text-center">
+                <button id="load-file-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-5 rounded-lg shadow-lg text-lg">Carregar Ficheiro Principal</button>
+                <input type="file" id="file-input" class="hidden" accept=".txt,.csv,.xlsx">
                 <p id="file-info" class="text-xs text-green-400 mt-2 h-4"></p>
                  <div class="mt-4 text-left border-t border-slate-700 pt-4">
                     <label for="manual-input" class="text-xs text-slate-400">Ou digite o ID manualmente:</label>
@@ -55,11 +57,13 @@
                     </div>
                 </div>
             </div>
-            <div id="view-encontrados" class="hidden">
-                <button id="export-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-lg mb-4">Exportar para Excel (.csv)</button>
+
+            <div data-view-content="encontrados" class="hidden">
+                <button id="export-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-lg mb-4">Exportar Encontrados (.csv)</button>
                 <div class="max-h-32 overflow-y-auto pr-2"><ul id="found-list" class="space-y-2 text-center font-mono text-sm"></ul></div>
             </div>
-            <div id="view-dashboard" class="hidden">
+
+            <div data-view-content="dashboard" class="hidden">
                 <h3 class="text-lg font-bold text-center text-white mb-4">Performance da Sessão</h3>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="flex flex-col items-center justify-center p-4 bg-slate-800 rounded-lg">
@@ -70,25 +74,41 @@
                     <div class="p-4 bg-slate-800 rounded-lg text-center"><h4 class="text-sm font-semibold text-slate-400">Bips por Minuto</h4><p id="kpi-bpm" class="text-4xl font-black text-white mt-2">--</p></div>
                 </div>
             </div>
+
+            <div data-view-content="inventario" class="hidden">
+                <h3 class="text-lg font-bold text-center text-white mb-4">Carregar Listas de Inventário por Zona</h3>
+                <div id="inventory-zones-container" class="space-y-4 max-h-64 overflow-y-auto pr-2">
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             let appState = {
-                idsToFind: new Set(), foundIds: [], isPaused: false, audioContext: null, html5QrCode: null,
-                scanHistory: [], charts: {}
+                currentView: 'procurar',
+                idsToFind: new Set(),
+                inventoryZones: [
+                    { id: 'buffered', name: 'Buffered' }, { id: 'sorting', name: 'Sorting' },
+                    { id: 'fraude', name: 'Fraude' }, { id: 'missort', name: 'Missort' },
+                    { id: 'returns', name: 'Returns' }, { id: 'bulky', name: 'Bulky' }
+                ],
+                inventoryZoneData: new Map(),
+                foundIds: [], 
+                isPaused: false,
+                audioContext: null,
+                html5QrCode: null,
+                scanHistory: [], 
+                charts: {}
             };
-            const SCAN_DELAY = 800;
+            
             const controlsPanel = document.getElementById('controls-panel');
             const panelHandle = document.getElementById('panel-handle');
             const togglePanel = () => controlsPanel.classList.toggle('open');
             panelHandle.addEventListener('click', togglePanel);
             
             let touchStartY = 0;
-            document.addEventListener('touchstart', e => {
-                if (e.target === panelHandle || controlsPanel.contains(e.target)) touchStartY = e.touches[0].clientY;
-            });
+            document.addEventListener('touchstart', e => { if (e.target === panelHandle || controlsPanel.contains(e.target)) touchStartY = e.touches[0].clientY; });
             document.addEventListener('touchend', e => {
                 if (touchStartY === 0) return;
                 const touchEndY = e.changedTouches[0].clientY;
@@ -98,8 +118,9 @@
             });
 
             function initialize() {
+                buildInventoryZoneUI();
                 document.getElementById('load-file-btn').addEventListener('click', () => document.getElementById('file-input').click());
-                document.getElementById('file-input').addEventListener('change', handleFileSelect);
+                document.getElementById('file-input').addEventListener('change', (e) => handleFileSelect(e, 'main'));
                 document.getElementById('export-btn').addEventListener('click', exportFoundIds);
                 document.body.addEventListener('click', initAudio, { once: true });
                 setupTabs();
@@ -120,9 +141,57 @@
                 createCharts();
             }
 
-            function handleFileSelect(event) {
+            function buildInventoryZoneUI() {
+                const container = document.getElementById('inventory-zones-container');
+                container.innerHTML = '';
+                appState.inventoryZones.forEach(zone => {
+                    appState.inventoryZoneData.set(zone.id, new Set());
+                    const div = document.createElement('div');
+                    div.className = "p-3 bg-slate-800 rounded-lg flex items-center justify-between";
+                    div.innerHTML = `
+                        <div>
+                            <p class="font-semibold text-white">${zone.name}</p>
+                            <p id="file-info-${zone.id}" class="text-xs text-slate-400">Nenhum ficheiro carregado.</p>
+                        </div>
+                        <button data-zone-id="${zone.id}" class="load-zone-file-btn bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-3 rounded-lg text-sm">Carregar</button>
+                        <input type="file" id="file-input-${zone.id}" class="hidden" accept=".txt,.csv,.xlsx">
+                    `;
+                    container.appendChild(div);
+                });
+
+                document.querySelectorAll('.load-zone-file-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.getElementById(`file-input-${e.currentTarget.dataset.zoneId}`).click();
+                    });
+                });
+                 document.querySelectorAll('input[type="file"]').forEach(input => {
+                    if (input.id.startsWith('file-input-')) {
+                        input.addEventListener('change', (e) => handleFileSelect(e, e.target.id.replace('file-input-', '')));
+                    }
+                });
+            }
+
+            function handleFileSelect(event, zoneId) {
                 const file = event.target.files[0]; if (!file) return;
+                const isMainSearch = zoneId === 'main';
+                
                 const reader = new FileReader();
+                const processIds = (ids, fileName) => {
+                    const idSet = new Set(ids);
+                    if (isMainSearch) {
+                        appState.idsToFind = idSet;
+                        appState.foundIds = [];
+                        appState.scanHistory = [];
+                        document.getElementById('file-info').textContent = `"${fileName}" (${ids.length} IDs)`;
+                        updateFoundListUI();
+                        updateDashboard();
+                    } else {
+                        appState.inventoryZoneData.set(zoneId, idSet);
+                         document.getElementById(`file-info-${zoneId}`).textContent = `${ids.length} IDs carregados.`;
+                         document.getElementById(`file-info-${zoneId}`).classList.add('text-green-400');
+                    }
+                };
+
                 if (file.name.endsWith('.xlsx')) {
                     reader.onload = (e) => {
                         const data = new Uint8Array(e.target.result);
@@ -144,13 +213,50 @@
                 }
             }
             
-            function processIds(ids, fileName) {
-                 appState.idsToFind = new Set(ids);
-                 appState.foundIds = [];
-                 appState.scanHistory = [];
-                 document.getElementById('file-info').textContent = `Ficheiro "${fileName}" carregado com ${ids.length} IDs.`;
-                 updateFoundListUI();
-                 updateDashboard();
+            function processScan(scannedId) {
+                if (appState.isPaused) return;
+                
+                if (appState.idsToFind.has(scannedId)) {
+                    showFeedback('success', scannedId);
+                    appState.idsToFind.delete(scannedId);
+                    appState.foundIds.unshift({ id: scannedId, timestamp: new Date() });
+                    appState.scanHistory.push(new Date());
+                    updateFoundListUI();
+                    updateDashboard();
+                    return;
+                }
+                
+                if (appState.foundIds.some(item => item.id === scannedId)) {
+                    showFeedback('warning', scannedId, 'JÁ ENCONTRADO');
+                    return;
+                }
+
+                for (const [zoneId, idSet] of appState.inventoryZoneData.entries()) {
+                    if (idSet.has(scannedId)) {
+                        const zone = appState.inventoryZones.find(z => z.id === zoneId);
+                        showFeedback('success', scannedId, `ENCONTRADO (EM ${zone.name.toUpperCase()})`);
+                        return;
+                    }
+                }
+                
+                showFeedback('error', scannedId);
+            }
+            
+            function setupTabs() {
+                const tabButtons = document.querySelectorAll('.tab-btn');
+                tabButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const viewId = button.dataset.view;
+                        appState.currentView = viewId;
+                        
+                        tabButtons.forEach(btn => btn.classList.replace('tab-active', 'tab-inactive'));
+                        button.classList.replace('tab-inactive', 'tab-active');
+                        
+                        document.querySelectorAll('[data-view-content]').forEach(view => {
+                            view.classList.toggle('hidden', view.dataset.viewContent !== viewId);
+                        });
+                    });
+                });
             }
 
             function exportFoundIds() {
@@ -165,39 +271,14 @@
                 link.setAttribute("href", encodedUri);
                 const date = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
                 link.setAttribute("download", `sessao_scanner_${date}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
             }
 
             function startScanner() {
                 appState.html5QrCode = new Html5Qrcode("reader");
-                const config = {
-                    fps: 15,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
-                        return { width: size, height: size };
-                    }
-                };
+                const config = { fps: 15, qrbox: (w, h) => { const s = Math.min(w, h) * 0.8; return { width: s, height: s }; } };
                 appState.html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => processScan(decodedText))
                     .catch(err => alert("ERRO AO INICIAR A CÂMARA: Por favor, verifique se deu permissão de acesso à câmara."));
-            }
-            
-            function processScan(scannedId) {
-                if (appState.isPaused) return;
-                
-                if (appState.idsToFind.has(scannedId)) {
-                    showFeedback('success', scannedId);
-                    appState.idsToFind.delete(scannedId);
-                    appState.foundIds.unshift({ id: scannedId, timestamp: new Date() });
-                    appState.scanHistory.push(new Date());
-                    updateFoundListUI();
-                    updateDashboard();
-                } else if (appState.foundIds.some(item => item.id === scannedId)) {
-                    showFeedback('warning', scannedId, 'JÁ ENCONTRADO');
-                } else {
-                    showFeedback('error', scannedId);
-                }
             }
             
             function updateFoundListUI() {
@@ -206,7 +287,7 @@
                 if (appState.foundIds.length === 0) {
                     foundList.innerHTML = '<li class="text-slate-500">Nenhum item encontrado ainda.</li>';
                 } else {
-                    foundList.innerHTML = appState.foundIds.map(item => `<li class="p-2 bg-slate-700 rounded-md text-white">${item.id}</li>`).join('');
+                    foundList.innerHTML = appState.foundIds.map(item => `<li class="p-2 bg-slate-700 rounded-md text-white flex justify-between"><span>${item.id}</span><span class="text-xs text-slate-400">${item.timestamp.toLocaleTimeString('pt-BR')}</span></li>`).join('');
                 }
             }
 
@@ -258,22 +339,6 @@
                 }, SCAN_DELAY);
             }
             
-            function setupTabs() {
-                const tabs = ['procurar', 'encontrados', 'dashboard'];
-                tabs.forEach(tabId => {
-                    document.getElementById(`tab-${tabId}`).addEventListener('click', () => {
-                        tabs.forEach(t => {
-                            document.getElementById(`tab-${t}`).classList.replace('tab-active', 'tab-inactive');
-                            const view = document.getElementById(`view-${t}`);
-                            if (view) view.classList.add('hidden');
-                        });
-                        document.getElementById(`tab-${tabId}`).classList.replace('tab-inactive', 'tab-active');
-                        const viewToShow = document.getElementById(`view-${tabId}`);
-                        if (viewToShow) viewToShow.classList.remove('hidden');
-                    });
-                });
-            }
-
             function initAudio() { if (!appState.audioContext) appState.audioContext = new (window.AudioContext || window.webkitAudioContext)(); }
             function playSound(type) {
                 if (!appState.audioContext) return;
