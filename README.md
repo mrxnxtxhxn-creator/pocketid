@@ -157,8 +157,8 @@
             <div class="w-20 h-20 bg-cyan-500 rounded-2xl mx-auto mb-6 flex items-center justify-center text-4xl text-white shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                 <i class="fas fa-cube"></i>
             </div>
-            <h1 class="text-3xl font-bold text-white mb-2">Natefy</h1>
-            <p class="text-slate-400 mb-8">Scanner & Logística Pro</p>
+            <h1 class="text-3xl font-bold text-white mb-2">Olá!</h1>
+            <p class="text-slate-400 mb-8">Vamos bipar?</p>
             
             <input type="text" id="operator-input" class="w-full bg-slate-800 border border-slate-600 text-white p-4 rounded-xl text-center text-lg mb-4 focus:border-cyan-500 outline-none" placeholder="Seu Nome">
             <button id="login-btn" class="btn-primary">ENTRAR</button>
@@ -299,18 +299,38 @@
                 updateUI();
             }
 
-            // --- LOGIN ---
+            // --- LOGIN (CORRIGIDO) ---
             function checkLogin() {
                 const modal = document.getElementById('login-modal');
-                if (!state.operator) modal.classList.remove('hidden');
-                else {
+                // Se já tem operador salvo, esconde o modal
+                if (state.operator) {
                     modal.classList.add('hidden');
                     document.getElementById('status-operator').innerText = state.operator.toUpperCase();
+                } else {
+                    // Se não tem, mostra o modal
+                    modal.classList.remove('hidden');
                 }
             }
+            
+            // Ação do Botão Entrar (Mais robusta)
             document.getElementById('login-btn').addEventListener('click', () => {
-                const val = document.getElementById('operator-input').value.trim();
-                if(val) { state.operator = val; saveState(); checkLogin(); }
+                const input = document.getElementById('operator-input');
+                const val = input.value.trim();
+                
+                if(val) { 
+                    // 1. Salva o estado
+                    state.operator = val; 
+                    saveState(); 
+                    
+                    // 2. Atualiza a UI
+                    document.getElementById('status-operator').innerText = state.operator.toUpperCase();
+                    
+                    // 3. Esconde o modal explicitamente
+                    document.getElementById('login-modal').classList.add('hidden');
+                    
+                } else {
+                    alert("Por favor, digite seu nome.");
+                }
             });
 
             // --- NAVEGAÇÃO ---
@@ -475,7 +495,7 @@
                 }, state.isFastMode ? 500 : 1500);
             }
 
-            // --- OCR (LEITURA DE FOTO CORRIGIDA) ---
+            // --- OCR (LEITURA DE FOTO) ---
             async function handleOCR(file) {
                 if (!file) return;
                 document.getElementById('ocr-loading').classList.remove('hidden');
@@ -491,7 +511,6 @@
                     let count = 0;
                     
                     // Regex melhorada para pegar IDs grandes no início da linha
-                    // Procura números de 8 a 14 dígitos
                     const idRegex = /(\d{8,14})/; 
 
                     const newIds = new Set();
@@ -504,7 +523,6 @@
                         if (match) {
                             const id = match[0];
                             // A descrição é tudo que vem DEPOIS do ID
-                            // Removemos o ID e caracteres separadores comuns como > - .
                             let desc = cleanLine.replace(id, '').replace(/^[\s\>\-\.]+/g, '').trim();
                             
                             if (desc.length < 3) desc = "Produto sem descrição"; // Fallback
