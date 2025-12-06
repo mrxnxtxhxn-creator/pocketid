@@ -2,8 +2,8 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Natefy Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Natefy Pro</title>
 
     <meta name="theme-color" content="#0f172a"/>
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,494 +17,680 @@
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        html, body { height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #0f172a; }
-        #reader__scan_region { border: 4px solid rgba(6, 182, 212, 0.5) !important; border-radius: 1.5rem; background: none !important; box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
-        #controls-panel { 
-            background: rgba(15, 23, 42, 0.98); 
-            border-top: 1px solid #334155; 
-            /* Altura base do painel: 65px da barra + padding */
-            transform: translateY(calc(100% - 65px)); 
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            padding-bottom: env(safe-area-inset-bottom, 20px); 
-            z-index: 50; 
+        /* Layout Fullscreen */
+        html, body { height: 100%; width: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #000; }
+        
+        /* Scanner ocupa a tela toda */
+        #reader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; object-fit: cover; }
+        #reader video { object-fit: cover; width: 100% !important; height: 100% !important; }
+
+        /* Área de Scan Visual (Mira) */
+        .scan-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80vw; height: 25vh;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Escurece o resto */
+            z-index: 10;
+            pointer-events: none;
         }
-        #controls-panel.open { transform: translateY(0); }
-        .tab-btn { border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; opacity: 0.6; }
-        .tab-active { border-color: #06b6d4; color: white; opacity: 1; }
-        .scan-success { animation: pulse-green 0.5s ease-out; }
-        #undo-btn { position: fixed; bottom: 140px; right: 20px; z-index: 60; background-color: #ef4444; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: transform 0.2s, opacity 0.2s; opacity: 0; pointer-events: none; transform: scale(0.8); }
-        #undo-btn.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
-        .conn-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .conn-online { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
-        .conn-offline { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
-        .conn-syncing { background-color: #eab308; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
+        .scan-line {
+            width: 100%; height: 2px; background: #06b6d4;
+            box-shadow: 0 0 4px #06b6d4;
+            animation: scanMove 2s infinite linear;
+        }
+        @keyframes scanMove { 0% { transform: translateY(0); } 50% { transform: translateY(25vh); } 100% { transform: translateY(0); } }
+
+        /* Menu Inferior Fixo (Estilo App Nativo) */
+        #bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #334155;
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 50;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #94a3b8; font-size: 10px; gap: 4px; width: 20%;
+        }
+        .nav-item i { font-size: 20px; margin-bottom: 2px; transition: transform 0.2s; }
+        .nav-item.active { color: #22d3ee; }
+        .nav-item.active i { transform: translateY(-2px); }
+
+        /* Painéis de Conteúdo (Cards Flutuantes) */
+        .content-panel {
+            position: absolute; bottom: 80px; left: 0; width: 100%;
+            max-height: 70vh; overflow-y: auto;
+            background: transparent;
+            z-index: 40;
+            display: none; /* Escondido por padrão */
+            padding: 0 16px;
+        }
+        .content-panel.active { display: block; animation: slideUp 0.3s ease-out; }
+        .panel-card {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid #475569;
+            border-radius: 16px;
+            padding: 16px;
+            color: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Status Bar Superior */
+        #top-bar {
+            position: absolute; top: 0; left: 0; width: 100%; height: 60px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            z-index: 30;
+            display: flex; justify-content: space-between; items-center; padding: 0 20px;
+            padding-top: env(safe-area-inset-top, 10px);
+        }
+
+        /* Feedback Overlay */
+        #feedback-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .scan-success { background: rgba(34, 197, 94, 0.85); }
+        .scan-error { background: rgba(239, 68, 68, 0.85); }
+        .scan-warning { background: rgba(234, 179, 8, 0.85); }
+
+        /* Botão Undo Flutuante */
+        #undo-btn {
+            position: absolute; top: 80px; right: 20px; z-index: 40;
+            background: #ef4444; color: white; width: 50px; height: 50px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #undo-btn.visible { opacity: 1; pointer-events: auto; }
+
+        /* Utilitários */
+        .hidden { display: none !important; }
+        .btn-primary { background: linear-gradient(to right, #0891b2, #2563eb); padding: 12px; border-radius: 12px; font-weight: bold; width: 100%; text-align: center; }
+        .btn-secondary { background: #334155; padding: 12px; border-radius: 12px; font-weight: bold; width: 100%; text-align: center; border: 1px solid #475569; }
+        
+        /* Canvas Oculto */
         #flowchart-canvas-container { position: absolute; top: -9999px; left: -9999px; width: 1200px; background-color: #0f172a; }
-        
-        /* LOGIN MODAL */
-        #login-modal { 
-            position: fixed; inset: 0; z-index: 100; 
-            background-color: rgba(15, 23, 42, 0.98); 
-            display: flex; align-items: center; justify-content: center; 
-            backdrop-filter: blur(5px); 
-        }
-        #login-modal.hidden { display: none !important; }
-        
-        #ocr-loading { position: fixed; inset: 0; z-index: 90; background-color: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        #ocr-loading.hidden { display: none; }
     </style>
 </head>
-<body class="text-slate-200">
+<body>
 
-    <div class="fixed top-0 left-0 right-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-700 p-2 flex justify-between items-center px-4 h-14">
-        <div class="flex items-center gap-2">
-            <div id="connection-status" class="conn-online"></div>
-            <div class="flex flex-col">
-                <span id="status-operator" class="text-xs font-bold text-white leading-tight">--</span>
-                <span id="status-zone" class="text-[10px] text-cyan-400 leading-tight">ZONA: --</span>
+    <div id="top-bar">
+        <div class="flex flex-col">
+            <span id="status-operator" class="text-sm font-bold text-white shadow-black drop-shadow-md">--</span>
+            <span id="status-zone" class="text-xs text-cyan-400 font-mono bg-black/40 px-2 rounded">ZONA: --</span>
+        </div>
+        <div class="flex gap-3">
+            <div id="conn-dot" class="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]"></div>
+        </div>
+    </div>
+
+    <div id="reader"></div>
+    <div class="scan-overlay">
+        <div class="scan-line"></div>
+    </div>
+
+    <div id="feedback-overlay">
+        <div class="text-center p-6">
+            <div id="fb-icon" class="text-6xl mb-4">✅</div>
+            <div id="fb-msg" class="text-4xl font-black text-white drop-shadow-md mb-2">ENCONTRADO</div>
+            <div id="fb-desc" class="text-lg text-white/90 font-medium bg-black/20 p-2 rounded">Descrição aqui</div>
+            <div id="fb-id" class="text-sm text-white/60 font-mono mt-2">ID: 123456</div>
+        </div>
+    </div>
+
+    <button id="undo-btn"><i class="fas fa-undo"></i></button>
+
+    <div id="ocr-loading" class="fixed inset-0 z-[70] bg-black/90 flex flex-col items-center justify-center hidden">
+        <i class="fas fa-sync fa-spin text-5xl text-cyan-500 mb-4"></i>
+        <p class="text-xl font-bold text-white">Lendo Imagem...</p>
+        <p class="text-sm text-slate-400 mt-2">Isso pode levar alguns segundos</p>
+    </div>
+
+    <div id="login-modal" class="fixed inset-0 z-[80] bg-slate-900 flex items-center justify-center p-6">
+        <div class="w-full max-w-sm text-center">
+            <div class="w-20 h-20 bg-cyan-500 rounded-2xl mx-auto mb-6 flex items-center justify-center text-4xl text-white shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+                <i class="fas fa-cube"></i>
             </div>
-        </div>
-        <div class="flex items-center gap-3">
-             <span id="queue-counter" class="text-[10px] text-yellow-500 font-mono hidden"><i class="fas fa-cloud-upload-alt"></i> <span id="queue-count">0</span></span>
-             <button id="refresh-global-btn" class="text-slate-400 hover:text-white"><i class="fas fa-sync-alt"></i></button>
-        </div>
-    </div>
-
-    <div id="reader" class="fixed top-14 bottom-0 left-0 w-full z-0"></div>
-    <div id="feedback-overlay" class="fixed inset-0 z-40 flex items-center justify-center p-6 text-white font-black opacity-0 pointer-events-none transition-opacity duration-200 bg-black/80 text-center"></div>
-    <button id="undo-btn"><i class="fas fa-undo fa-lg"></i></button>
-
-    <div id="ocr-loading" class="hidden">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-cyan-500 mb-4"></div>
-        <p class="text-lg font-bold">Processando...</p>
-    </div>
-
-    <div id="login-modal">
-        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl w-11/12 max-w-md text-center border border-slate-600">
-            <div class="mb-6 text-cyan-500 text-6xl"><i class="fas fa-box-open"></i></div>
-            <input type="text" id="operator-input" class="w-full bg-slate-700 text-white p-4 rounded-xl mb-4 border border-slate-600 focus:border-cyan-500 outline-none text-center text-lg" placeholder="Nome do Operador">
-            <button id="login-btn" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 px-4 rounded-xl transition-all transform active:scale-95">ENTRAR</button>
+            <h1 class="text-3xl font-bold text-white mb-2">Natefy</h1>
+            <p class="text-slate-400 mb-8">Scanner & Logística Pro</p>
+            
+            <input type="text" id="operator-input" class="w-full bg-slate-800 border border-slate-600 text-white p-4 rounded-xl text-center text-lg mb-4 focus:border-cyan-500 outline-none" placeholder="Seu Nome">
+            <button id="login-btn" class="btn-primary">ENTRAR</button>
         </div>
     </div>
 
-    <div id="controls-panel" class="fixed bottom-0 w-full shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        <div id="panel-handle" class="w-full h-8 flex justify-center items-center cursor-pointer"><div class="w-12 h-1.5 bg-slate-600 rounded-full"></div></div>
-        <div class="w-full max-w-2xl mx-auto px-4 pb-4">
-             <div class="w-full overflow-x-auto pb-2 mb-2 scrollbar-hide">
-                <div class="flex justify-start space-x-2">
-                    <button data-view="procurar" class="tab-btn tab-active py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">🔍 Procurar</button>
-                    <button data-view="encontrados" class="tab-btn tab-inactive py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">📋 Global</button>
-                    <button data-view="dashboard" class="tab-btn tab-inactive py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">📊 Dash</button>
-                    <button data-view="analisador" class="tab-btn tab-inactive py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">⚖️ Comp.</button>
-                    <button data-view="zonas" class="tab-btn tab-inactive py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">📦 Zonas</button>
-                    <button data-view="excecoes" class="tab-btn tab-inactive py-2 px-3 font-semibold text-sm rounded-lg whitespace-nowrap">⚠️ Erros</button>
+    <div id="view-procurar" class="content-panel active">
+        <div class="panel-card space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <button id="load-file-btn" class="bg-slate-800 p-4 rounded-xl border border-slate-600 flex flex-col items-center gap-2 active:bg-slate-700">
+                    <i class="fas fa-file-excel text-2xl text-green-500"></i>
+                    <span class="text-xs font-bold">PLANILHA</span>
+                </button>
+                <button id="load-image-btn" class="bg-slate-800 p-4 rounded-xl border border-slate-600 flex flex-col items-center gap-2 active:bg-slate-700">
+                    <i class="fas fa-camera text-2xl text-cyan-500"></i>
+                    <span class="text-xs font-bold">FOTO (OCR)</span>
+                </button>
+            </div>
+            <input type="file" id="file-input" class="hidden" accept=".xlsx,.csv">
+            <input type="file" id="image-input" class="hidden" accept="image/*">
+            
+            <div id="file-status" class="bg-slate-900/50 p-2 rounded text-xs text-center text-slate-400">
+                Nenhuma lista carregada
+            </div>
+
+            <div class="flex gap-2">
+                <input type="text" id="manual-input" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-sm text-white" placeholder="Digitar ID...">
+                <button id="manual-btn" class="bg-cyan-600 px-5 rounded-lg font-bold"><i class="fas fa-check"></i></button>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg">
+                <span class="text-sm text-slate-300">Modo Rápido</span>
+                <input type="checkbox" id="fast-mode-toggle" class="w-5 h-5 accent-cyan-500">
+            </div>
+             
+             <div class="flex gap-2 mt-2">
+                 <button id="clear-btn" class="flex-1 py-2 text-xs text-red-400 border border-red-900 rounded">Limpar</button>
+                 <button id="logout-btn" class="flex-1 py-2 text-xs text-slate-400 border border-slate-700 rounded">Sair</button>
+             </div>
+        </div>
+    </div>
+
+    <div id="view-dashboard" class="content-panel">
+        <div class="panel-card space-y-4 text-center">
+            <h2 class="text-lg font-bold text-white">Performance</h2>
+            <div class="flex justify-center">
+                <div class="relative w-32 h-32">
+                    <canvas id="progressChart"></canvas>
+                    <div class="absolute inset-0 flex items-center justify-center text-2xl font-bold" id="progress-text">0%</div>
                 </div>
             </div>
-
-            <div data-view-content="procurar" class="block text-center">
-                 <div class="grid grid-cols-2 gap-3 mb-4">
-                     <button id="load-file-btn" class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-xs flex items-center justify-center gap-2"><i class="fas fa-file-excel text-green-500"></i> Lista (Excel)</button>
-                     <button id="load-image-btn" class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-xs flex items-center justify-center gap-2"><i class="fas fa-camera text-cyan-500"></i> Lista (Foto)</button>
-                 </div>
-                <input type="file" id="file-input" class="hidden" accept=".xlsx,.csv"><input type="file" id="image-input" class="hidden" accept="image/*">
-                <p id="file-info" class="text-xs text-green-400 mt-1 min-h-[1.2rem] font-mono"></p>
-                 <div class="mt-3 text-left border-t border-slate-700 pt-3 space-y-3">
-                    <div class="p-3 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <div class="flex justify-between items-center mb-2"><label class="text-xs text-slate-300 font-bold uppercase">Modo Caça</label><span id="hunt-status" class="text-xs text-cyan-400 font-mono"></span></div>
-                        <div class="flex gap-2"><input type="text" id="hunt-target-id" class="w-full bg-slate-900 text-white p-2 rounded-lg font-mono border border-slate-600 text-sm" placeholder="ID Alvo"><button id="hunt-toggle-btn" class="bg-blue-600 hover:bg-blue-500 font-bold px-4 rounded-lg text-sm">Ativar</button></div>
-                    </div>
-                    <div class="flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                        <span class="text-sm text-slate-300 font-medium">Modo Rápido</span><input type="checkbox" id="fast-mode-toggle" class="w-4 h-4 accent-cyan-500">
-                    </div>
-                    <div class="flex gap-2"><button id="clear-session-btn" class="flex-1 bg-red-900/50 hover:bg-red-900 text-red-200 font-bold py-2 px-4 rounded-lg text-xs border border-red-800">Limpar</button><button id="change-operator-btn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2 px-4 rounded-lg text-xs">Sair</button></div>
-                    <div class="flex gap-2 mt-1"><input type="text" id="manual-input" class="w-full bg-slate-700 p-3 rounded-xl font-mono text-white border border-slate-600 outline-none" placeholder="ID Manual..."><button id="manual-check-btn" class="bg-blue-600 hover:bg-blue-500 font-bold px-4 rounded-xl">OK</button></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900 p-3 rounded-lg">
+                    <div class="text-2xl font-bold text-cyan-400" id="kpi-total">0</div>
+                    <div class="text-[10px] text-slate-500 uppercase">Total Bipado</div>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-lg">
+                    <div class="text-2xl font-bold text-red-400" id="kpi-error">0</div>
+                    <div class="text-[10px] text-slate-500 uppercase">Erros / Missort</div>
                 </div>
             </div>
-
-            <div data-view-content="encontrados" class="hidden">
-                <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-white">Global</h3><button id="export-btn" class="text-xs bg-green-700 px-3 py-1 rounded text-white">Baixar</button></div>
-                <div id="global-list" class="space-y-2 max-h-[50vh] overflow-y-auto pb-20"><p class="text-center text-slate-500 text-sm mt-4">Aguardando sincronização...</p></div>
-            </div>
-
-            <div data-view-content="dashboard" class="hidden text-center">
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 relative"><canvas id="progressChart"></canvas><div class="absolute inset-0 flex items-center justify-center font-bold text-xl" id="progress-text">0%</div></div>
-                    <div class="flex flex-col gap-2">
-                        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700"><span class="text-xs text-slate-400">SEUS BIPS</span><div id="kpi-my-bips" class="text-2xl font-bold text-cyan-400">0</div></div>
-                         <div class="bg-slate-800 p-3 rounded-xl border border-slate-700"><span class="text-xs text-slate-400">GLOBAL</span><div id="kpi-global-bips" class="text-2xl font-bold text-white">0</div></div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-6"><button id="download-full-report-btn" class="bg-green-800 text-green-100 p-3 rounded-xl text-xs font-bold">📊 Excel</button><button id="download-flowchart-btn" class="bg-purple-800 text-purple-100 p-3 rounded-xl text-xs font-bold">🖼️ Fluxo</button></div>
-                <div id="zone-finds-container" class="space-y-2"></div>
-            </div>
-
-             <div data-view-content="analisador" class="hidden space-y-4">
-                <div class="space-y-2"><select id="analysis-list-a" class="w-full bg-slate-700 p-2 rounded-lg text-white"><option value="">Lista A...</option></select></div>
-                <div class="space-y-2"><select id="analysis-list-b" class="w-full bg-slate-700 p-2 rounded-lg text-white"><option value="">Lista B...</option></select></div>
-                <button id="run-analysis-btn" class="w-full bg-blue-600 font-bold py-3 rounded-lg">Comparar</button>
-                <div id="analysis-results-container" class="hidden grid grid-cols-3 gap-2 text-center text-xs"><div class="bg-slate-800 p-2 rounded"><span class="block text-xl font-bold text-green-400" id="result-ok">0</span>OK</div><div class="bg-slate-800 p-2 rounded"><span class="block text-xl font-bold text-orange-400" id="result-sobra">0</span>Sobra</div><div class="bg-slate-800 p-2 rounded"><span class="block text-xl font-bold text-red-400" id="result-faltantes">0</span>Falta</div></div>
-            </div>
-            <div data-view-content="zonas" class="hidden"><div id="inventory-zones-container" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2"></div></div>
-            <div data-view-content="excecoes" class="hidden"><div id="exceptions-list" class="space-y-2 text-xs font-mono"></div></div>
-            <div data-view-content="log" class="hidden"><div id="local-log-list" class="space-y-2 text-xs"></div></div>
+             <button id="download-report-btn" class="btn-primary text-sm"><i class="fas fa-file-export mr-2"></i> Baixar Relatório Excel</button>
+             <button id="download-flow-btn" class="btn-secondary text-sm"><i class="fas fa-image mr-2"></i> Baixar Fluxograma</button>
         </div>
     </div>
+
+    <div id="view-log" class="content-panel">
+        <div class="panel-card">
+            <h2 class="text-lg font-bold text-white mb-2">Histórico do Dia</h2>
+            <div id="scan-log-list" class="space-y-2 max-h-[50vh] overflow-y-auto">
+                <div class="text-center text-slate-500 text-xs py-4">Vazio</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="view-zonas" class="content-panel">
+         <div class="panel-card">
+            <h2 class="text-lg font-bold text-white mb-2">Zonas</h2>
+            <div id="zones-list" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <nav id="bottom-nav">
+        <div class="nav-item active" data-target="procurar">
+            <i class="fas fa-search"></i>
+            <span>Scan</span>
+        </div>
+        <div class="nav-item" data-target="log">
+            <i class="fas fa-list"></i>
+            <span>Log</span>
+        </div>
+        <div class="nav-item" data-target="dashboard">
+            <i class="fas fa-chart-pie"></i>
+            <span>Dash</span>
+        </div>
+        <div class="nav-item" data-target="zonas">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>Zonas</span>
+        </div>
+    </nav>
+
     <div id="flowchart-canvas-container"></div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // CONFIGURAÇÃO
-            const APP_CONFIG = {
-                WEBHOOK_WRITE: 'https://mrxnxtxhxn-creator.app.n8n.cloud/webhook-test/df5b4afe-2fc4-4692-a80f-257aca92edf9', // Sua URL
-                WEBHOOK_READ: '', 
-                STORAGE_KEY: 'natefy_v3',
-                SYNC_INTERVAL: 15000
+            // CONFIG
+            const CONFIG = {
+                STORAGE_KEY: 'natefy_pro_v4',
+                WEBHOOK: 'https://mrxnxtxhxn-creator.app.n8n.cloud/webhook-test/df5b4afe-2fc4-4692-a80f-257aca92edf9' // Coloque sua URL aqui
             };
 
-            // ESTADO GLOBAL
-            let appState = {
-                operator: null, 
-                idsToFind: new Set(), 
-                idDescriptions: new Map(), 
-                inventoryZoneData: new Map(),
-                foundIds: [], 
-                localLog: [], 
-                globalLog: [], 
-                offlineQueue: [],
+            let state = {
+                operator: null,
+                idsToFind: new Set(),
+                idDescriptions: new Map(),
+                foundIds: [], // {id, time, status, desc}
+                logs: [], // Histórico completo
+                activeZone: null,
                 inventoryZones: [
                     {id:'buffered',name:'Buffered'},{id:'sorting',name:'Sorting'},
                     {id:'fraude',name:'Fraude'},{id:'missort',name:'Missort'},
-                    {id:'returns',name:'Returns'},{id:'bulky',name:'Bulky'},
-                    {id:'problemsolver',name:'Problem Solver'}
+                    {id:'returns',name:'Returns'},{id:'bulky',name:'Bulky'}
                 ],
-                activeZone: null, 
-                huntMode: { isActive: false, targetId: null },
-                analysisResult: { ok: [], sobra: [], faltantes: [] },
-                isScanning: false, 
-                isFastMode: false, 
+                zoneData: new Map(),
+                isFastMode: false,
+                isPaused: false,
                 lastScanTime: 0,
-                zoneFinds: new Map(),
-                audioContext: null,
-                html5QrCode: null,
-                chart: null,
-                isPaused: false // Necessário para controlar o Fast Mode
+                lastUndo: null
             };
 
-            // --- SISTEMA DE LOGIN ---
-            function checkLogin() {
-                if (!appState.operator) { 
-                    document.getElementById('login-modal').classList.remove('hidden'); 
-                } else { 
-                    document.getElementById('login-modal').classList.add('hidden'); 
-                    updateStatusUI(); 
-                    startScanner(); 
-                }
-            }
-
-            document.getElementById('login-btn').addEventListener('click', () => {
-                const name = document.getElementById('operator-input').value.trim();
-                if (name) { 
-                    appState.operator = name; 
-                    saveState(); 
-                    checkLogin(); 
-                } else { 
-                    alert("Nome obrigatório"); 
-                }
-            });
-
-            // --- INICIALIZAÇÃO ---
+            // --- INIT ---
             function init() {
                 loadState();
-                buildInventoryZoneUI();
-                buildAnalyzerUI(); // Para popular as listas do analisador
-                checkLogin(); 
-                setupEventListeners();
-                createCharts();
+                checkLogin();
+                setupNav();
+                setupActions();
+                startScanner();
                 updateUI();
             }
 
-            // --- EVENT LISTENER PRINCIPAL (CORREÇÃO DO PAINEL) ---
-            function setupEventListeners() {
-                const controlsPanel = document.getElementById('controls-panel');
-                const panelHandle = document.getElementById('panel-handle');
-                let panelIsOpen = controlsPanel.classList.contains('open'); // Verifica estado inicial
+            // --- LOGIN ---
+            function checkLogin() {
+                const modal = document.getElementById('login-modal');
+                if (!state.operator) modal.classList.remove('hidden');
+                else {
+                    modal.classList.add('hidden');
+                    document.getElementById('status-operator').innerText = state.operator.toUpperCase();
+                }
+            }
+            document.getElementById('login-btn').addEventListener('click', () => {
+                const val = document.getElementById('operator-input').value.trim();
+                if(val) { state.operator = val; saveState(); checkLogin(); }
+            });
 
-                // Botões Gerais
-                document.getElementById('change-operator-btn').addEventListener('click', () => {
-                    if(confirm("Sair?")) { appState.operator = null; saveState(); window.location.reload(); }
-                });
-                document.getElementById('load-file-btn').addEventListener('click', () => document.getElementById('file-input').click());
-                document.getElementById('file-input').addEventListener('change', (e) => handleFileSelect(e, 'main'));
-                document.getElementById('load-image-btn').addEventListener('click', () => document.getElementById('image-input').click());
-                document.getElementById('image-input').addEventListener('change', handleImageUpload);
-                document.getElementById('export-btn').addEventListener('click', exportFoundIds);
-                document.getElementById('clear-session-btn').addEventListener('click', clearSession);
-                document.getElementById('fast-mode-toggle').addEventListener('change', (e) => appState.isFastMode = e.target.checked);
-                document.getElementById('hunt-toggle-btn').addEventListener('click', toggleHuntMode);
-                
-                // Análises e Relatórios
-                document.getElementById('run-analysis-btn').addEventListener('click', runListAnalysis);
-                document.getElementById('download-full-report-btn').addEventListener('click', downloadFullReport);
-                document.getElementById('download-flowchart-btn').addEventListener('click', downloadFlowchart);
+            // --- NAVEGAÇÃO ---
+            function setupNav() {
+                const navItems = document.querySelectorAll('.nav-item');
+                const views = document.querySelectorAll('.content-panel');
 
-                // Input Manual
-                const manualInput = document.getElementById('manual-input');
-                const checkManual = () => { 
-                    const v = manualInput.value.trim(); 
-                    if(v) { processScan(v); manualInput.value=''; }
-                };
-                document.getElementById('manual-check-btn').addEventListener('click', checkManual);
-                manualInput.addEventListener('keydown', (e) => { 
-                    if(e.key === 'Enter'){ e.preventDefault(); checkManual(); }
-                });
+                navItems.forEach(item => {
+                    item.addEventListener('click', () => {
+                        // 1. Muda visual do menu
+                        navItems.forEach(n => n.classList.remove('active'));
+                        item.classList.add('active');
 
-                // Audio Init
-                document.body.addEventListener('click', () => {
-                    if(!appState.audioContext) appState.audioContext = new (window.AudioContext||window.webkitAudioContext)();
-                }, { once: true });
-
-                // Abas
-                document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.addEventListener('click', () => {
-                        document.querySelectorAll('.tab-btn').forEach(x=>x.classList.replace('tab-active','tab-inactive'));
-                        b.classList.replace('tab-inactive','tab-active');
-                        document.querySelectorAll('[data-view-content]').forEach(d => d.classList.add('hidden'));
-                        document.querySelector(`[data-view-content="${b.dataset.view}"]`).classList.remove('hidden');
-                        if(b.dataset.view === 'zonas') buildInventoryZoneUI(); // Recarrega o contador da aba Zonas
+                        // 2. Mostra/Esconde Painéis
+                        const target = item.dataset.target;
+                        views.forEach(v => v.classList.remove('active'));
+                        
+                        // Se for 'procurar', a gente esconde todos os painéis para ver a câmera
+                        // Se for outro, mostra o painel correspondente
+                        if (target !== 'procurar') {
+                            document.getElementById(`view-${target}`).classList.add('active');
+                            if(target === 'dashboard') updateDashboard();
+                            if(target === 'zonas') renderZones();
+                        }
                     });
                 });
+            }
 
-                // --- PAINEL DESLIZANTE: CORREÇÃO ---
-                let touchStartY = 0;
+            // --- AÇÕES E BOTÕES ---
+            function setupActions() {
+                // Uploads
+                document.getElementById('load-file-btn').onclick = () => document.getElementById('file-input').click();
+                document.getElementById('file-input').onchange = (e) => handleFile(e.target.files[0]);
+                
+                document.getElementById('load-image-btn').onclick = () => document.getElementById('image-input').click();
+                document.getElementById('image-input').onchange = (e) => handleOCR(e.target.files[0]);
 
-                const togglePanel = () => {
-                    controlsPanel.classList.toggle('open');
-                    panelIsOpen = controlsPanel.classList.contains('open');
-                    if (!panelIsOpen) {
-                        resumeScannerIfNeeded();
-                    }
+                // Manual Scan
+                document.getElementById('manual-btn').onclick = () => {
+                    const v = document.getElementById('manual-input').value.trim();
+                    if(v) { processScan(v); document.getElementById('manual-input').value=''; }
                 };
+
+                // Fast Mode
+                document.getElementById('fast-mode-toggle').onchange = (e) => state.isFastMode = e.target.checked;
+
+                // Undo
+                document.getElementById('undo-btn').onclick = doUndo;
+
+                // System
+                document.getElementById('logout-btn').onclick = () => { state.operator = null; saveState(); location.reload(); };
+                document.getElementById('clear-btn').onclick = () => { if(confirm('Apagar tudo?')) { localStorage.removeItem(CONFIG.STORAGE_KEY); location.reload(); }};
                 
-                // 1. Clique na alça (funciona sempre)
-                panelHandle.addEventListener('click', togglePanel);
-
-                // 2. Toque para subir/descer (Dispositivos móveis)
-                document.addEventListener('touchstart', e => { 
-                    if (e.target === panelHandle || controlsPanel.contains(e.target)) {
-                        touchStartY = e.touches[0].clientY; 
-                    } else {
-                        touchStartY = 0; 
-                    }
-                });
-
-                document.addEventListener('touchend', e => {
-                    if (touchStartY === 0) return; 
-                    
-                    const touchEndY = e.changedTouches[0].clientY; 
-                    const diff = touchStartY - touchEndY; // Positivo = deslizando para cima
-
-                    // Deslizar para CIMA (Abrir)
-                    if (diff > 50 && !panelIsOpen) {
-                        controlsPanel.classList.add('open');
-                        panelIsOpen = true;
-                    } 
-                    // Deslizar para BAIXO (Fechar)
-                    else if (diff < -50 && panelIsOpen) {
-                        controlsPanel.classList.remove('open');
-                        panelIsOpen = false;
-                        resumeScannerIfNeeded(); 
-                    }
-
-                    touchStartY = 0; 
-                });
+                // Reports
+                document.getElementById('download-report-btn').onclick = downloadExcel;
+                document.getElementById('download-flow-btn').onclick = downloadFlow;
             }
 
-            // --- LÓGICA DO SCANNER ---
+            // --- CORE: SCANNER ---
             function startScanner() {
-                 if(appState.html5QrCode) return;
-                 appState.html5QrCode = new Html5Qrcode("reader");
-                 appState.html5QrCode.start({facingMode:"environment"}, {fps:15, qrbox:250}, processScan).catch(e=>{});
+                const html5QrCode = new Html5Qrcode("reader");
+                html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, 
+                    (decodedText) => processScan(decodedText)
+                ).catch(err => console.log("Erro Câmera", err));
             }
-            
-            function resumeScannerIfNeeded() { 
-                 // Retoma se o painel fechou E o Modo Caça não estiver ativo
-                 if(!appState.huntMode.isActive && appState.html5QrCode && appState.html5QrCode.getState()===2) appState.html5QrCode.resume(); 
-            }
-            
+
             function processScan(id) {
-                if (appState.huntMode.isActive) {
-                    if (id === appState.huntMode.targetId) {
-                        feedback('success', id, 'ALVO ENCONTRADO!', true);
-                        sendLogToN8n({ scannedId:id, timestamp: new Date().toISOString(), status: 'Hunt Success', operator: appState.operator });
-                        toggleHuntMode();
-                    } return;
-                }
+                // Debounce (Evita bips duplos rápidos)
+                const now = Date.now();
+                if (now - state.lastScanTime < 1000) return;
+                state.lastScanTime = now;
+
+                if (state.isPaused) return;
+                if (!state.isFastMode) state.isPaused = true;
+
+                // --- LÓGICA DE NEGÓCIO ---
+                // Limpeza básica do ID (remove espaços extras)
+                id = id.trim();
+
+                // Recupera descrição do mapa de OCR
+                const desc = state.idDescriptions.get(id) || "Sem descrição";
                 
-                // Pausa se não for Fast Mode
-                if (appState.isPaused) return;
-                if (appState.isFastMode) { 
-                    const now = Date.now(); 
-                    if (now - appState.lastScanTime < 500) return; 
-                    appState.lastScanTime = now; 
-                } else { 
-                    appState.isPaused = true; 
-                }
+                let status = "NÃO ENCONTRADO";
+                let type = "error";
+                let feedbackMsg = "NÃO ENCONTRADO";
 
-                const now = new Date();
-                const desc = appState.idDescriptions.get(id) || '';
-                let status = 'ERRO', msg = 'NÃO ENCONTRADO', type = 'error';
-
-                // Checa Missort
-                if (appState.activeZone) {
-                    for (const [zId, ids] of appState.inventoryZoneData) {
-                        if (zId !== appState.activeZone && ids.has(id)) { 
-                            status = 'MISSORT'; msg = `MISSORT (${zId})`; type = 'warning'; break; 
+                // 1. Verifica Missort (Se zona estiver ativa)
+                if (state.activeZone) {
+                    for (const [zId, zSet] of state.zoneData) {
+                        if (zId !== state.activeZone && zSet.has(id)) {
+                            status = "MISSORT";
+                            type = "warning";
+                            feedbackMsg = `MISSORT (${zId})`;
+                            break;
                         }
                     }
                 }
 
-                // Checa Sucesso
-                if (status === 'ERRO' && appState.idsToFind.has(id)) { 
-                    status = 'SUCESSO'; msg = desc || 'ENCONTRADO'; type = 'success'; 
-                    appState.idsToFind.delete(id); 
+                // 2. Verifica Duplicidade
+                if (status === "NÃO ENCONTRADO" && state.foundIds.some(x => x.id === id)) {
+                    status = "DUPLICADO";
+                    type = "warning";
+                    feedbackMsg = "JÁ BIPADO";
                 }
 
-                const entry = { id, status, desc, time: now.toISOString(), operator: appState.operator, zone: appState.activeZone };
-                appState.localLog.unshift(entry);
-                if(status === 'SUCESSO') appState.foundIds.unshift(entry);
+                // 3. Verifica Sucesso
+                if (status === "NÃO ENCONTRADO" && state.idsToFind.has(id)) {
+                    status = "SUCESSO";
+                    type = "success";
+                    feedbackMsg = "ENCONTRADO";
+                    state.idsToFind.delete(id); // Remove da lista para não duplicar depois
+                }
+
+                // Registra
+                const entry = {
+                    id, status, desc, type,
+                    time: new Date().toISOString(),
+                    operator: state.operator,
+                    zone: state.activeZone
+                };
+
+                state.logs.unshift(entry);
+                if (status === "SUCESSO") state.foundIds.unshift(entry);
+                state.lastUndo = entry;
 
                 saveState();
-                feedback(type, id, msg);
+                showFeedback(type, feedbackMsg, desc, id);
                 updateUI();
-
-                sendLogToN8n({ ...entry, scannedId: id, activeZoneId: appState.activeZone });
+                sendToN8n(entry);
             }
 
-            // --- PERSISTÊNCIA & N8N ---
+            // --- FEEDBACK VISUAL ---
+            function showFeedback(type, msg, desc, id) {
+                const overlay = document.getElementById('feedback-overlay');
+                const icon = document.getElementById('fb-icon');
+                const txt = document.getElementById('fb-msg');
+                const dsc = document.getElementById('fb-desc');
+                const idtxt = document.getElementById('fb-id');
+                const undo = document.getElementById('undo-btn');
+
+                overlay.className = `fixed inset-0 z-40 flex items-center justify-center p-6 text-white font-black transition-opacity duration-200 text-center scan-${type}`;
+                
+                icon.innerText = type === 'success' ? '✅' : (type === 'error' ? '❌' : '⚠️');
+                txt.innerText = msg;
+                dsc.innerText = desc;
+                idtxt.innerText = id;
+
+                // Mostra overlay
+                overlay.style.opacity = '1';
+                
+                // Mostra botão undo
+                undo.classList.add('visible');
+                setTimeout(() => undo.classList.remove('visible'), 5000);
+
+                // Som e Vibração
+                if(navigator.vibrate) navigator.vibrate(200);
+                
+                // Esconde depois de um tempo
+                setTimeout(() => {
+                    overlay.style.opacity = '0';
+                    if (!state.isFastMode) state.isPaused = false;
+                }, state.isFastMode ? 500 : 1500);
+            }
+
+            // --- OCR (LEITURA DE FOTO CORRIGIDA) ---
+            async function handleOCR(file) {
+                if (!file) return;
+                document.getElementById('ocr-loading').classList.remove('hidden');
+                
+                try {
+                    const worker = Tesseract.createWorker();
+                    await worker.load(); await worker.loadLanguage('eng'); await worker.initialize('eng');
+                    const { data: { text } } = await worker.recognize(file);
+                    await worker.terminate();
+
+                    // Processamento Inteligente
+                    const lines = text.split('\n');
+                    let count = 0;
+                    
+                    // Regex melhorada para pegar IDs grandes no início da linha
+                    // Procura números de 8 a 14 dígitos
+                    const idRegex = /(\d{8,14})/; 
+
+                    const newIds = new Set();
+                    
+                    lines.forEach(line => {
+                        // Remove caracteres estranhos comuns em OCR
+                        const cleanLine = line.replace(/[^\w\s\>\-\.\(\)\/]/gi, '');
+                        const match = cleanLine.match(idRegex);
+                        
+                        if (match) {
+                            const id = match[0];
+                            // A descrição é tudo que vem DEPOIS do ID
+                            // Removemos o ID e caracteres separadores comuns como > - .
+                            let desc = cleanLine.replace(id, '').replace(/^[\s\>\-\.]+/g, '').trim();
+                            
+                            if (desc.length < 3) desc = "Produto sem descrição"; // Fallback
+
+                            newIds.add(id);
+                            state.idDescriptions.set(id, desc);
+                            count++;
+                        }
+                    });
+
+                    if (count > 0) {
+                        state.idsToFind = newIds;
+                        state.foundIds = []; // Resetar encontrados
+                        document.getElementById('file-status').innerText = `📷 Foto: ${count} itens`;
+                        document.getElementById('file-status').className = "bg-green-900/50 p-2 rounded text-xs text-center text-green-400";
+                        alert(`${count} itens lidos da foto!`);
+                        saveState();
+                    } else {
+                        alert("Não encontrei IDs válidos na foto. Tente uma imagem mais nítida.");
+                    }
+
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro ao ler imagem.");
+                } finally {
+                    document.getElementById('ocr-loading').classList.add('hidden');
+                }
+            }
+
+            // --- EXCEL (FILE) ---
+            function handleFile(file) {
+                if(!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                    
+                    // Assume ID na coluna A (index 0)
+                    const ids = json.map(r => String(r[0])).filter(i => i && i.match(/\d+/));
+                    
+                    state.idsToFind = new Set(ids);
+                    state.foundIds = [];
+                    document.getElementById('file-status').innerText = `📂 Excel: ${ids.length} itens`;
+                    document.getElementById('file-status').className = "bg-green-900/50 p-2 rounded text-xs text-center text-green-400";
+                    saveState();
+                    alert(`${ids.length} itens carregados.`);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // --- UNDO ---
+            function doUndo() {
+                if(!state.lastUndo) return;
+                
+                // Remove do log local
+                state.logs.shift();
+                
+                // Se era sucesso, devolve pra lista de procurar e tira de encontrados
+                if (state.lastUndo.status === "SUCESSO") {
+                    state.foundIds.shift();
+                    state.idsToFind.add(state.lastUndo.id);
+                }
+
+                // Envia evento de cancelamento pro n8n
+                sendToN8n({ ...state.lastUndo, status: "CANCELADO" });
+
+                state.lastUndo = null;
+                document.getElementById('undo-btn').classList.remove('visible');
+                updateUI();
+                alert("Desfeito!");
+            }
+
+            // --- N8N ---
+            function sendToN8n(data) {
+                if(CONFIG.WEBHOOK.includes("https")) {
+                    fetch(CONFIG.WEBHOOK, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify(data)
+                    }).catch(e => console.log("Offline/Erro N8N"));
+                }
+            }
+
+            // --- ZONES ---
+            function renderZones() {
+                const c = document.getElementById('inventory-zones-container');
+                c.innerHTML = `<button class="w-full bg-slate-700 py-3 rounded-lg mb-3 text-sm" onclick="window.setZone(null)">🚫 Sair da Zona</button>`;
+                state.inventoryZones.forEach(z => {
+                    const isActive = state.activeZone === z.id;
+                    c.innerHTML += `
+                        <div class="bg-slate-800 p-4 rounded-xl flex justify-between items-center mb-2 border ${isActive ? 'border-green-500' : 'border-slate-700'}">
+                            <span class="font-bold text-white">${z.name}</span>
+                            <button class="px-4 py-2 rounded-lg text-xs font-bold ${isActive ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'}" onclick="window.setZone('${z.id}')">
+                                ${isActive ? 'ATIVA' : 'ATIVAR'}
+                            </button>
+                        </div>`;
+                });
+            }
+            window.setZone = (id) => { 
+                state.activeZone = id; 
+                document.getElementById('status-zone').innerText = `ZONA: ${id ? id.toUpperCase() : '--'}`;
+                saveState();
+                renderZones();
+            };
+
+            // --- UI UPDATES ---
+            function updateUI() {
+                // Log List
+                const list = document.getElementById('scan-log-list');
+                list.innerHTML = state.logs.slice(0, 50).map(l => `
+                    <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex justify-between items-center mb-2">
+                        <div>
+                            <div class="font-bold text-white text-sm">${l.id}</div>
+                            <div class="text-[10px] text-slate-400 truncate w-40">${l.desc}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] font-bold ${l.status==='SUCESSO'?'text-green-400':(l.status==='ERRO'?'text-red-400':'text-yellow-400')}">${l.status}</div>
+                            <div class="text-[10px] text-slate-500">${new Date(l.time).toLocaleTimeString()}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function updateDashboard() {
+                const total = state.idsToFind.size + state.foundIds.length;
+                const pct = total > 0 ? Math.round((state.foundIds.length / total) * 100) : 0;
+                
+                // Update Chart
+                const ctx = document.getElementById('progressChart');
+                if (ctx) {
+                    if(state.chart) state.chart.destroy();
+                    state.chart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: { datasets: [{ data: [pct, 100-pct], backgroundColor: ['#0ea5e9', '#1e293b'], borderWidth: 0 }] },
+                        options: { cutout: '80%', plugins: { tooltip: { enabled: false } } }
+                    });
+                }
+                document.getElementById('progress-text').innerText = pct + "%";
+                document.getElementById('kpi-total').innerText = state.logs.length;
+                document.getElementById('kpi-error').innerText = state.logs.filter(l=>l.status==='ERRO' || l.status==='MISSORT').length;
+            }
+
+            // --- RELATÓRIOS ---
+            function downloadExcel() {
+                if(state.logs.length === 0) return alert("Sem dados");
+                const ws = XLSX.utils.json_to_sheet(state.logs);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Logs");
+                XLSX.writeFile(wb, "Relatorio_Natefy.xlsx");
+            }
+            
+            async function downloadFlow() {
+                 if(state.logs.length === 0) return alert("Sem dados");
+                 const container = document.getElementById('flowchart-canvas-container');
+                 // Simples visualização para print
+                 container.innerHTML = `<div style="padding:50px; background:#0f172a; color:white; text-align:center">
+                    <h1>Relatório Visual</h1>
+                    <h2>${state.operator}</h2>
+                    <div style="display:flex; justify-content:center; gap:20px; margin-top:50px">
+                        <div style="border:2px solid green; padding:20px">SUCESSO: ${state.foundIds.length}</div>
+                        <div style="border:2px solid red; padding:20px">ERROS: ${state.logs.filter(l=>l.status!=='SUCESSO').length}</div>
+                    </div>
+                 </div>`;
+                 const canvas = await html2canvas(container);
+                 const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'Fluxo.png'; a.click();
+            }
+
+            // --- SAVE/LOAD ---
             function saveState() {
-                const s = { ...appState, html5QrCode: null, audioContext: null, chart: null };
+                const s = { ...state, html5QrCode: null, chart: null };
                 s.idsToFind = Array.from(s.idsToFind);
-                s.inventoryZoneData = Array.from(s.inventoryZoneData.entries()).map(([k,v])=>[k,Array.from(v)]);
                 s.idDescriptions = Array.from(s.idDescriptions.entries());
-                localStorage.setItem(APP_CONFIG.STORAGE_KEY, JSON.stringify(s));
+                s.inventoryZoneData = Array.from(s.inventoryZoneData.entries()).map(([k,v])=>[k,Array.from(v)]);
+                localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(s));
             }
             function loadState() {
-                const s = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEY));
+                const s = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY));
                 if(s) {
-                    appState = { ...appState, ...s };
-                    appState.idsToFind = new Set(s.idsToFind);
-                    appState.inventoryZoneData = new Map(s.inventoryZoneData.map(([k,v])=>[k,new Set(v)]));
-                    appState.idDescriptions = new Map(s.idDescriptions);
+                    state = { ...state, ...s };
+                    state.idsToFind = new Set(s.idsToFind);
+                    state.idDescriptions = new Map(s.idDescriptions);
+                    state.inventoryZoneData = new Map(s.inventoryZoneData.map(([k,v])=>[k,new Set(v)]));
                 }
             }
-            function clearSession() { localStorage.removeItem(APP_CONFIG.STORAGE_KEY); window.location.reload(); }
-
-            async function sendLogToN8n(data) {
-                if(APP_CONFIG.WEBHOOK_WRITE && !APP_CONFIG.WEBHOOK_WRITE.includes('COLE_A')) {
-                    try {
-                        // Envio assíncrono para não travar o scanner
-                        await fetch(APP_CONFIG.WEBHOOK_WRITE, { 
-                            method: 'POST', 
-                            headers:{'Content-Type':'application/json'}, 
-                            body: JSON.stringify(data) 
-                        });
-                    } catch(e) { console.log("Erro envio n8n", e); }
-                }
-            }
-
-            // --- FUNÇÕES DE UI / DASHBOARD ---
-            function feedback(type, id, msg, persistent) {
-                const el = document.getElementById('feedback-overlay');
-                const colors = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b' };
-                el.style.background = `radial-gradient(circle, ${colors[type] || colors.error}, transparent)`;
-                el.innerHTML = `<div class="text-center"><div class="text-4xl font-black mb-2">${msg}</div><div class="text-xl font-mono bg-black/50 p-2 rounded">${id}</div></div>`;
-                el.style.opacity = '1';
-                
-                // Audio Feedback
-                if(appState.audioContext) {
-                    const o=appState.audioContext.createOscillator(), g=appState.audioContext.createGain();
-                    o.connect(g); g.connect(appState.audioContext.destination);
-                    o.frequency.value = type==='success'?1200 : (type==='warning'?600:200);
-                    o.start(); setTimeout(()=>o.stop(), 150);
-                }
-                
-                if(navigator.vibrate) navigator.vibrate(200);
-                setTimeout(() => { 
-                    el.style.opacity = '0'; 
-                    if(!appState.isFastMode && !persistent) appState.isPaused = false; 
-                }, persistent ? 2000 : 1000);
-            }
-            
-            function updateUI() {
-                // ... (Atualiza contadores e log visual)
-                const total = appState.idsToFind.size + appState.foundIds.length;
-                const pct = total > 0 ? Math.round((appState.foundIds.length/total)*100) : 0;
-                document.getElementById('progress-text').innerText = pct + '%';
-                document.getElementById('kpi-my-bips').innerText = appState.localLog.length;
-                
-                if(appState.chart) { 
-                    appState.chart.data.datasets[0].data = [pct, 100-pct]; 
-                    appState.chart.update(); 
-                }
-            }
-
-            function updateStatusUI() {
-                document.getElementById('status-zone').innerText = `ZONA: ${appState.activeZone || '--'}`;
-                document.getElementById('status-operator').innerText = `OP: ${appState.operator || '--'}`;
-            }
-
-            function buildInventoryZoneUI() {
-                const c = document.getElementById('inventory-zones-container');
-                let html = `<button class="w-full bg-slate-600 text-white py-2 rounded mb-2 text-xs" onclick="setActiveZone(null)">Limpar Zona</button>`;
-                
-                appState.inventoryZones.forEach(z => {
-                    if(!appState.inventoryZoneData.has(z.id)) appState.inventoryZoneData.set(z.id, new Set());
-                    const count = appState.inventoryZoneData.get(z.id).size;
-                    html += `<div class="bg-slate-800 p-2 rounded flex justify-between items-center mb-2"><span class="text-sm">${z.name} (${count})</span> <button class="text-xs bg-blue-600 px-2 py-1 rounded" onclick="setActiveZone('${z.id}')">Ativar</button> <input type="file" class="hidden" id="file-${z.id}" onchange="handleFileSelect(event, '${z.id}')"><button class="text-xs bg-slate-600 px-2 py-1 rounded ml-1" onclick="document.getElementById('file-${z.id}').click()">Load</button></div>`;
-                });
-                c.innerHTML = html;
-            }
-            window.setActiveZone = (zid) => { appState.activeZone = zid; updateStatusUI(); saveState(); };
-            window.handleFileSelect = handleFileSelect; 
-
-            function createCharts() {
-                const ctx = document.getElementById('progressChart');
-                if(ctx) {
-                    appState.chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [0, 100], backgroundColor: ['#0ea5e9', '#334155'], borderWidth: 0 }] }, options: { cutout: '80%', plugins: { tooltip: { enabled: false } } } });
-                }
-            }
-            
-            function toggleHuntMode() {
-                const t = document.getElementById('hunt-target-id');
-                if(appState.huntMode.isActive) {
-                    appState.huntMode={isActive:false, targetId:null}; t.disabled=false; t.value='';
-                    document.getElementById('hunt-toggle-btn').innerText='Ativar';
-                    document.getElementById('hunt-status').innerText = '';
-                    resumeScannerIfNeeded();
-                } else {
-                    const v = t.value.trim(); if(!v) return alert("ID?");
-                    appState.huntMode={isActive:true, targetId:v}; t.disabled=true;
-                    document.getElementById('hunt-toggle-btn').innerText='Cancelar';
-                    document.getElementById('hunt-status').innerText = 'ATIVO';
-                    if(appState.html5QrCode && appState.html5QrCode.getState()===1) appState.html5QrCode.pause(true); // Pausa para economizar bateria
-                }
-                saveState();
-            }
-
-            // Implementação mínima de funções não essenciais para não gerar erro
-            function buildAnalyzerUI() {}
-            function runListAnalysis() { alert("Análise em desenvolvimento."); }
-            function exportFoundIds() { alert("Exportar encontrado em desenvolvimento."); }
-            function downloadFullReport() { alert("Download de relatório em desenvolvimento."); }
-            function downloadFlowchart() { alert("Download de fluxo em desenvolvimento."); }
-
-            // --- OCR & Arquivos (Mínimo) ---
-            function handleFileSelect(e, zid) { /* ... (Lógica mínima de leitura) ... */ }
-            async function handleImageUpload(e) { /* ... (Lógica mínima OCR) ... */ }
-
 
             init();
         });
