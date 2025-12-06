@@ -27,6 +27,19 @@
         #reader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; object-fit: cover; }
         #reader video { object-fit: cover; width: 100% !important; height: 100% !important; }
 
+        /* Área de Scan Visual (QUADRADO SEM LINHA) */
+        .scan-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 70vw;  /* Largura */
+            height: 70vw; /* Altura igual à largura para formar um quadrado */
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Escurece o resto */
+            z-index: 10;
+            pointer-events: none;
+        }
+        /* Linha de scan e animação removidas daqui */
+
         /* Menu Inferior Fixo */
         #bottom-nav {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
@@ -105,6 +118,9 @@
     </div>
 
     <div id="reader"></div>
+
+    <div class="scan-overlay">
+        </div>
 
     <div id="feedback-overlay">
         <div class="text-center p-6">
@@ -366,4 +382,141 @@
         // --- UTILS ---
         function sendToN8n(data) {
             if(CONFIG.WEBHOOK.includes("https")) {
-                fetch(CONFIG.WEBHOOK,
+                fetch(CONFIG.WEBHOOK, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data) }).catch(e => console.log("Offline"));
+            }
+        }
+        function saveState() {
+            const s = { ...state, html5QrCode: null, chart: null };
+            s.idsToFind = Array.from(s.idsToFind);
+            s.idDescriptions = Array.from(s.idDescriptions.entries());
+            s.inventoryZoneData = Array.from(s.inventoryZoneData.entries()).map(([k,v])=>[k,Array.from(v)]);
+            localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(s));
+        }
+        function loadState() {
+            const s = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY));
+            if(s) {
+                state = { ...state, ...s };
+                state.idsToFind = new Set(s.idsToFind);
+                state.idDescriptions = new Map(s.idDescriptions);
+                state.inventoryZoneData = new Map(s.inventoryZoneData.map(([k,v])=>[k,new Set(v)]));
+            }
+        }
+        window.clearSession = function() { if(confirm('Apagar?')) { localStorage.removeItem(CONFIG.STORAGE_KEY); location.reload(); } };
+        
+        // --- OCR / FILE ---
+        function handleFile(file) {
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                const ids = json.map(r => String(r[0])).filter(i => i && i.match(/\d+/));
+                state.idsToFind = new Set(ids);
+                state.foundIds = [];
+                document.getElementById('file-status').innerText = `📂 Excel: ${ids.length} itens`;
+                saveState();
+                alert(`${ids.length} itens carregados.`);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        async function handleOCR(file) {
+            if (!file) return;
+            document.getElementById('ocr-loading').classList.remove('hidden');
+            try {
+                const worker = Tesseract.createWorker();
+                await worker.load(); await worker.loadLanguage('eng'); await worker.initialize('eng');
+                const { data: { text } } = await worker.recognize(file);
+                await worker.terminate();
+                const lines = text.split('\n');
+                let count = 0;
+                const newIds = new Set();
+                lines.forEach(line => {
+                    const match = line.replace(/[^\w\s\>\-\.\(\)\/]/gi, '').match(/(\d{8,14})/);
+                    if (match) {
+                        const id = match[0];
+                        let desc = line.replace(id, '').replace(/^[\s\>\-\.]+/g, '').trim();
+                        if (desc.length < 3) desc = "Sem Descrição";
+                        newIds.add(id);
+                        state.idDescriptions.set(id, desc);
+                        count++;
+                    }
+                });
+                if (count > 0) {
+                    state.idsToFind = newIds;
+                    state.foundIds = [];
+                    document.getElementById('file-status').innerText = `📷 Foto: ${count} itens`;
+                    alert(`${count} itens lidos!`);
+                    saveState();
+                } else { alert("Nada encontrado."); }
+            } catch (e) { alert("Erro OCR"); } finally { document.getElementById('ocr-loading').classList.add('hidden'); }
+        }
+
+        // --- DASHBOARD & ZONAS ---
+        function updateUI() {
+            const list = document.getElementById('scan-log-list');
+            list.innerHTML = state.logs.slice(0, 50).map(l => `
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex justify-between items-center mb-2">
+                    <div><div class="font-bold text-white text-sm">${l.id}</div><div class="text-[10px] text-slate-400 truncate w-40">${l.desc}</div></div>
+                    <div class="text-right"><div class="text-[10px] font-bold ${l.status==='SUCESSO'?'text-green-400':(l.status==='ERRO'?'text-red-400':'text-yellow-400')}">${l.status}</div><div class="text-[10px] text-slate-500">${new Date(l.time).toLocaleTimeString()}</div></div>
+                </div>`).join('');
+        }
+        function updateDashboard() {
+            const total = state.idsToFind.size + state.foundIds.length;
+            const pct = total > 0 ? Math.round((state.foundIds.length / total) * 100) : 0;
+            const ctx = document.getElementById('progressChart');
+            if (ctx) {
+                if(state.chart) state.chart.destroy();
+                state.chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [pct, 100-pct], backgroundColor: ['#0ea5e9', '#1e293b'], borderWidth: 0 }] }, options: { cutout: '80%', plugins: { tooltip: { enabled: false } } } });
+            }
+            document.getElementById('progress-text').innerText = pct + "%";
+            document.getElementById('kpi-total').innerText = state.logs.length;
+            document.getElementById('kpi-error').innerText = state.logs.filter(l=>l.status==='ERRO' || l.status==='MISSORT').length;
+        }
+        function renderZones() {
+            const c = document.getElementById('zones-list');
+            c.innerHTML = `<button class="w-full bg-slate-700 py-3 rounded-lg mb-3 text-sm" onclick="window.setZone(null)">🚫 Sair da Zona</button>`;
+            state.inventoryZones.forEach(z => {
+                const isActive = state.activeZone === z.id;
+                c.innerHTML += `<div class="bg-slate-800 p-4 rounded-xl flex justify-between items-center mb-2 border ${isActive ? 'border-green-500' : 'border-slate-700'}"><span class="font-bold text-white">${z.name}</span><button class="px-4 py-2 rounded-lg text-xs font-bold ${isActive ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'}" onclick="window.setZone('${z.id}')">${isActive ? 'ATIVA' : 'ATIVAR'}</button></div>`;
+            });
+        }
+        function doUndo() {
+            if(!state.lastUndo) return;
+            state.logs.shift();
+            if (state.lastUndo.status === "SUCESSO") { state.foundIds.shift(); state.idsToFind.add(state.lastUndo.id); }
+            sendToN8n({ ...state.lastUndo, status: "CANCELADO" });
+            state.lastUndo = null;
+            document.getElementById('undo-btn').classList.remove('visible');
+            updateUI();
+            alert("Desfeito!");
+        }
+        function toggleHuntMode() {
+            const t = document.getElementById('hunt-target-id');
+            if(state.huntMode && state.huntMode.isActive) {
+                state.huntMode={isActive:false, targetId:null}; t.disabled=false; t.value='';
+                document.getElementById('hunt-toggle-btn').innerText='Ativar';
+                document.getElementById('hunt-status').innerText = '';
+            } else {
+                const v = t.value.trim(); if(!v) return alert("ID?");
+                state.huntMode={isActive:true, targetId:v}; t.disabled=true;
+                document.getElementById('hunt-toggle-btn').innerText='Cancelar';
+                document.getElementById('hunt-status').innerText = 'ATIVO';
+            }
+            saveState();
+        }
+        function downloadExcel() {
+            if(state.logs.length === 0) return alert("Sem dados");
+            const ws = XLSX.utils.json_to_sheet(state.logs); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Logs"); XLSX.writeFile(wb, "Relatorio.xlsx");
+        }
+        async function downloadFlow() {
+             if(state.logs.length === 0) return alert("Sem dados");
+             const container = document.getElementById('flowchart-canvas-container');
+             container.innerHTML = `<div style="padding:50px; background:#0f172a; color:white; text-align:center"><h1>Relatório Visual</h1><h2>${state.operator}</h2><div style="display:flex; justify-content:center; gap:20px; margin-top:50px"><div style="border:2px solid green; padding:20px">SUCESSO: ${state.foundIds.length}</div><div style="border:2px solid red; padding:20px">ERROS: ${state.logs.filter(l=>l.status!=='SUCESSO').length}</div></div></div>`;
+             const canvas = await html2canvas(container);
+             const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'Fluxo.png'; a.click();
+        }
+    </script>
+</body>
+</html>
