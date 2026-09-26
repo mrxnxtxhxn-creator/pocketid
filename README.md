@@ -1,3 +1,18 @@
+Aqui está o código ajustado para telas de **notebook/laptop** (resoluções como 1366x768 ou 1920x1080 em telas de 13" a 15.6"):
+
+### Principais alterações aplicadas:
+
+1. **Redimensionamento Proporcional Flexível**: Remoção da altura fixa de `380px` do `#main-panel`. Agora ele usa `flex: 1 1 50%` com `max-height: 55vh`, permitindo que o viewport do leitor e o painel inferior dividam a tela sem cortar nada.
+2. **Compactação Visual para Telas Baixas**:
+* Diminuição dos paddings no `.scanner-box`, botões, campos de texto e `.top-bar`.
+* Ajuste nas fontes do visor principal (`.last-scan-display`) e ícone do leitor para caberem confortavelmente em telas com altura vertical reduzida.
+
+
+3. **Media Queries para Telas de 768px ou Menores**: Adicionada regra `@media (max-height: 768px)` que reduz os tamanhos dos elementos automaticamente quando a janela do navegador estiver minimizada ou em displays menores.
+4. **Grid Responsiva**: A `.kpi-grid` agora se ajusta automaticamente (`minmax(130px, 1fr)`), evitando quebrar linhas de forma desconectada.
+5. **Scroll Interno Protegido**: Garantia de que a barra de abas (`.tab-row`) e o container de conteúdo tenham rolagens independentes sem empurrar o cabeçalho para fora do visor.
+
+```html
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -47,66 +62,70 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── LAYOUT PRINCIPAL DESKTOP ── */
+/* ── LAYOUT PRINCIPAL ── */
 #app-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
 }
 
 /* ── TOP BAR ── */
 #top-bar {
-  padding: 16px 24px;
+  padding: 10px 20px;
   display: flex; justify-content: space-between; align-items: center;
   background: var(--surface-0);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-.tb-left { display: flex; align-items: center; gap: 14px; }
+.tb-left { display: flex; align-items: center; gap: 12px; }
 .tb-avatar {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 36px; height: 36px; border-radius: 8px;
   background: var(--accent-lo); border: 1px solid var(--accent);
   display: flex; align-items: center; justify-content: center;
-  color: var(--accent); font-size: 18px; cursor: pointer;
+  color: var(--accent); font-size: 16px; cursor: pointer;
 }
-.tb-op { font-size: 14px; font-weight: 600; }
+.tb-op { font-size: 13px; font-weight: 600; }
 .tb-zone {
-  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
   color: var(--accent-hi); background: var(--accent-lo);
   border: 1px solid rgba(59,130,246,0.25);
-  border-radius: 5px; padding: 2px 8px; margin-top: 2px; display: inline-block;
+  border-radius: 4px; padding: 2px 6px; margin-top: 1px; display: inline-block;
 }
 .tb-right { display: flex; align-items: center; gap: 10px; }
 .zebra-badge {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface-2); border: 1px solid var(--border-hi);
-  padding: 6px 12px; border-radius: 20px; font-size: 12px; font-family: var(--mono);
+  padding: 5px 10px; border-radius: 20px; font-size: 11px; font-family: var(--mono);
 }
 .dot-live {
-  width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
   box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite;
 }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
 /* ── TELA CENTRAL DE BIPAGEM ZEBRA ── */
 #zebra-viewport {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at center, rgba(59,130,246,0.05) 0%, transparent 70%);
-  padding: 20px;
+  padding: 16px;
   position: relative;
+  overflow: hidden;
 }
 
 .scanner-box {
   background: var(--surface-1);
   border: 2px dashed var(--accent);
-  border-radius: 24px;
-  padding: 40px;
+  border-radius: 18px;
+  padding: 20px 30px;
   text-align: center;
-  max-width: 500px;
+  max-width: 460px;
   width: 100%;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   transition: all 0.2s;
@@ -128,46 +147,51 @@ html, body {
 }
 
 .scanner-icon {
-  font-size: 48px;
+  font-size: 36px;
   color: var(--accent);
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .last-scan-display {
   font-family: var(--mono);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--green);
-  margin-top: 10px;
+  margin-top: 6px;
   word-break: break-all;
-  min-height: 38px;
+  min-height: 30px;
 }
 
-/* ── NAU & PAINEL DE CONTROLE ── */
+/* ── PAINEL DE CONTROLE / TABS ── */
 #main-panel {
-  height: 380px;
+  flex: 1 1 50%;
+  min-height: 250px;
+  max-height: 55vh;
   background: var(--surface-1);
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .tab-row {
-  display: flex; gap: 8px; padding: 12px 24px;
+  display: flex; gap: 6px; padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-0);
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 .tab-pill {
-  padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600;
+  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600;
   color: var(--text-2); cursor: pointer; border: 1px solid var(--border);
-  background: transparent; transition: all .15s;
+  background: transparent; transition: all .15s; white-space: nowrap;
 }
 .tab-pill.active {
   background: var(--accent); color: white; border-color: var(--accent);
 }
 
 .tab-content-container {
-  flex: 1; overflow-y: auto; padding: 20px 24px;
+  flex: 1; overflow-y: auto; padding: 16px 20px;
 }
 .tab-content { display: none; }
 .tab-content.active { display: block; animation: fadeUp .2s ease; }
@@ -176,44 +200,44 @@ html, body {
 /* ── COMPONENTES & FORMULÁRIOS ── */
 .field {
   background: var(--surface-0); border: 1px solid var(--border);
-  color: var(--text-1); font-family: var(--sans); font-size: 14px;
-  padding: 12px 14px; border-radius: 12px; outline: none; width: 100%;
+  color: var(--text-1); font-family: var(--sans); font-size: 13px;
+  padding: 10px 12px; border-radius: 10px; outline: none; width: 100%;
 }
 .field:focus { border-color: var(--accent); }
 
 .btn { 
-  border-radius: 12px; font-weight: 600; font-size: 14px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  gap: 8px; border: none; padding: 12px 20px; transition: all .15s;
+  border-radius: 10px; font-weight: 600; font-size: 13px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; border: none; padding: 10px 16px; transition: all .15s;
 }
 .btn-primary { background: var(--accent); color: white; }
 .btn-primary:hover { background: #2563EB; }
 .btn-ghost { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
 .btn-danger { background: var(--red-lo); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
 
-.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .upload-card {
   background: var(--surface-0); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px; display: flex; flex-direction: column;
-  align-items: center; gap: 8px; cursor: pointer; transition: all .15s;
+  border-radius: 12px; padding: 14px; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; cursor: pointer; transition: all .15s;
 }
 .upload-card:hover { border-color: var(--accent); background: var(--accent-lo); }
 
-/* KPI Grid */
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.kpi-card { background: var(--surface-0); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
-.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; margin-bottom: 6px; }
-.kpi-val { font-family: var(--mono); font-size: 28px; font-weight: 700; }
+/* KPI Grid Ajustado para Notebook */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi-card { background: var(--surface-0); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.kpi-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; margin-bottom: 4px; }
+.kpi-val { font-family: var(--mono); font-size: 22px; font-weight: 700; }
 .kpi-val.blue { color: var(--accent-hi); }
 .kpi-val.green { color: var(--green); }
 .kpi-val.purple { color: #A78BFA; }
 .kpi-val.red { color: var(--red); }
 
 /* Listas / Inventário */
-.inv-summary { display: flex; gap: 16px; margin-bottom: 14px; font-size: 12px; font-family: var(--mono); flex-wrap: wrap; }
-.inv-section-title { font-size: 12px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; }
+.inv-summary { display: flex; gap: 14px; margin-bottom: 12px; font-size: 12px; font-family: var(--mono); flex-wrap: wrap; }
+.inv-section-title { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 6px; }
 .inv-section-title:first-of-type { margin-top: 0; }
-.status-chip { font-size: 11px; font-weight: 700; font-family: var(--mono); padding: 2px 8px; border-radius: 6px; }
+.status-chip { font-size: 10px; font-weight: 700; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; }
 .status-chip.ok { color: var(--green); background: var(--green-lo); }
 .status-chip.pending { color: var(--yellow); background: var(--yellow-lo); }
 .status-chip.missort { color: var(--red); background: var(--red-lo); }
@@ -222,36 +246,48 @@ html, body {
 /* Logs */
 .log-item {
   background: var(--surface-0); border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 14px; display: flex;
+  border-radius: 8px; padding: 8px 12px; display: flex;
   justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px;
 }
-.log-id { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.log-id { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+
+/* ── MEDIA QUERIES PARA NOTEBOOK / TELA REDUZIDA ── */
+@media (max-height: 768px) {
+  #top-bar { padding: 8px 16px; }
+  #zebra-viewport { padding: 10px; min-height: 140px; }
+  .scanner-box { padding: 14px 20px; max-width: 380px; }
+  .scanner-icon { font-size: 28px; margin-bottom: 2px; }
+  .scanner-box h3 { font-size: 14px !important; }
+  .last-scan-display { font-size: 18px; min-height: 24px; margin-top: 2px; }
+  .tab-row { padding: 8px 12px; }
+  .tab-content-container { padding: 12px 16px; }
+}
 
 /* ── FEEDBACK TOAST ── */
 #feedback {
-  position: fixed; top: 80px; right: 24px; z-index: 100;
+  position: fixed; top: 60px; right: 20px; z-index: 100;
   pointer-events: none; opacity: 0; transition: opacity .2s;
 }
 .fb-pill {
   background: var(--surface-2); border: 1px solid var(--accent);
-  border-radius: 14px; padding: 14px 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  border-radius: 12px; padding: 10px 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   text-align: center;
 }
 .fb-pill.fb-warn { border-color: var(--yellow); }
 .fb-pill.fb-error { border-color: var(--red); }
-.fb-status { font-size: 11px; font-weight: 700; color: var(--accent-hi); font-family: var(--mono); }
+.fb-status { font-size: 10px; font-weight: 700; color: var(--accent-hi); font-family: var(--mono); }
 .fb-pill.fb-warn .fb-status { color: var(--yellow); }
 .fb-pill.fb-error .fb-status { color: var(--red); }
-.fb-id { font-family: var(--mono); font-size: 18px; font-weight: 700; margin-top: 2px; }
+.fb-id { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-top: 2px; }
 
 /* ── LOGIN SCREEN ── */
 #login-screen {
   position: fixed; inset: 0; z-index: 200; background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
 }
 .login-box {
   background: var(--surface-1); border: 1px solid var(--border);
-  padding: 40px; border-radius: 24px; width: 100%; max-width: 380px; text-align: center;
+  padding: 30px; border-radius: 20px; width: 100%; max-width: 360px; text-align: center;
 }
 .hidden { display: none !important; }
 </style>
@@ -261,10 +297,10 @@ html, body {
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-box">
-    <div style="font-size:40px; color:var(--accent); margin-bottom:12px"><i class="ri-barcode-box-line"></i></div>
-    <h2 style="font-size:22px; margin-bottom:6px">Natefy Pro</h2>
-    <p style="font-size:13px; color:var(--text-2); margin-bottom:24px">Estação de Bipagem Zebra DSS22</p>
-    <div style="display:flex; flex-direction:column; gap:12px">
+    <div style="font-size:36px; color:var(--accent); margin-bottom:8px"><i class="ri-barcode-box-line"></i></div>
+    <h2 style="font-size:20px; margin-bottom:4px">Natefy Pro</h2>
+    <p style="font-size:12px; color:var(--text-2); margin-bottom:20px">Estação de Bipagem Zebra DSS22</p>
+    <div style="display:flex; flex-direction:column; gap:10px">
       <input type="text" id="op-input" class="field" style="text-align:center;" placeholder="Nome do Operador">
       <button class="btn btn-primary" onclick="doLogin()">ENTRAR <i class="ri-arrow-right-line"></i></button>
     </div>
@@ -295,8 +331,8 @@ html, body {
   <div id="zebra-viewport">
     <div class="scanner-box" id="scan-box">
       <i class="ri-barcode-line scanner-icon"></i>
-      <h3 style="font-size:16px; font-weight:600">Aguardando Bipagem</h3>
-      <p style="font-size:12px; color:var(--text-3); margin-top:4px">Use o leitor físico Zebra DSS22 a qualquer momento</p>
+      <h3 style="font-size:15px; font-weight:600">Aguardando Bipagem</h3>
+      <p style="font-size:11px; color:var(--text-3); margin-top:2px">Use o leitor físico Zebra DSS22 a qualquer momento</p>
       <div class="last-scan-display" id="last-scan-display">---</div>
     </div>
   </div>
@@ -316,12 +352,12 @@ html, body {
 
       <!-- SCAN / OPERAÇÃO TAB -->
       <div id="view-scan" class="tab-content active">
-        <div class="card-grid" style="margin-bottom:16px">
+        <div class="card-grid" style="margin-bottom:12px">
           <div class="upload-card" onclick="document.getElementById('file-input').click()">
-            <i class="ri-file-excel-2-fill" style="color:#10B981; font-size:28px"></i>
+            <i class="ri-file-excel-2-fill" style="color:#10B981; font-size:24px"></i>
             <span style="font-size:12px; font-weight:600">Carregar Planilha Excel</span>
           </div>
-          <div style="display:flex; gap:8px; align-items:center; background:var(--surface-0); padding:12px; border-radius:14px; border:1px solid var(--border);">
+          <div style="display:flex; gap:8px; align-items:center; background:var(--surface-0); padding:10px; border-radius:12px; border:1px solid var(--border);">
             <input type="text" id="manual-input" class="field" placeholder="Ou digite o ID manualmente...">
             <button class="btn btn-primary" onclick="scanManual()"><i class="ri-check-line"></i></button>
           </div>
@@ -329,7 +365,7 @@ html, body {
 
         <input type="file" id="file-input" class="hidden" accept=".xlsx,.csv">
 
-        <div id="file-status" class="hidden" style="margin-bottom:12px; font-size:13px; color:var(--green)">
+        <div id="file-status" class="hidden" style="margin-bottom:10px; font-size:12px; color:var(--green)">
           <i class="ri-checkbox-circle-fill"></i> Lista ativa carregada: <span id="file-count">0 itens</span>
         </div>
 
@@ -340,14 +376,14 @@ html, body {
 
       <!-- LISTAS TAB -->
       <div id="view-listas" class="tab-content">
-        <p style="font-size:13px; color:var(--text-2); margin-bottom:10px">Itens Pendentes vs Bipados:</p>
+        <p style="font-size:12px; color:var(--text-2); margin-bottom:8px">Itens Pendentes vs Bipados:</p>
         <div id="inventory-list"></div>
       </div>
 
       <!-- ZONAS TAB -->
       <div id="view-zonas" class="tab-content">
-        <p style="font-size:13px; color:var(--text-2); margin-bottom:10px">Selecione a Zona de Bipagem Atual:</p>
-        <div id="zones-list" style="display:flex; gap:10px; flex-wrap:wrap"></div>
+        <p style="font-size:12px; color:var(--text-2); margin-bottom:8px">Selecione a Zona de Bipagem Atual:</p>
+        <div id="zones-list" style="display:flex; gap:8px; flex-wrap:wrap"></div>
       </div>
 
       <!-- DASHBOARD TAB -->
@@ -382,8 +418,8 @@ html, body {
 
       <!-- PERFIL TAB -->
       <div id="view-perfil" class="tab-content">
-        <h3 id="p-name" style="margin-bottom:4px">—</h3>
-        <p style="font-size:13px; color:var(--text-3); margin-bottom:16px">Operador Conectado</p>
+        <h3 id="p-name" style="margin-bottom:2px; font-size:16px">—</h3>
+        <p style="font-size:12px; color:var(--text-3); margin-bottom:14px">Operador Conectado</p>
         <button class="btn btn-danger" onclick="logout()"><i class="ri-logout-box-r-line"></i> Sair da Conta</button>
       </div>
 
@@ -469,8 +505,6 @@ let zebraBuffer = '';
 let zebraTimer = null;
 
 document.addEventListener('keydown', function(e) {
-  // Ignora o leitor sempre que o foco estiver em QUALQUER campo de texto
-  // (login, manual, etc.) — evita que digitação normal vire "bipagem fantasma".
   const tag = e.target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -486,7 +520,6 @@ document.addEventListener('keydown', function(e) {
   if (e.key.length === 1) {
     zebraBuffer += e.key;
     clearTimeout(zebraTimer);
-    // Leitores enviam caracteres em alta velocidade. Se demorar mais de 50ms, limpa o buffer.
     zebraTimer = setTimeout(() => { zebraBuffer = ''; }, 50);
   }
 });
@@ -503,29 +536,22 @@ function onScan(rawId) {
   const alreadyFound = S.found.includes(id);
   const isUnexpected = hasList && !idsToFindSet.has(id);
 
-  // Prioridade: duplicado > fora da lista > ok
   let status = 'ok';
   if (alreadyFound) status = 'duplicate';
   else if (isUnexpected) status = 'missort';
 
   playBeep(status);
 
-  // Atualiza Visual da tela principal
   document.getElementById('last-scan-display').textContent = id;
   const scanBox = document.getElementById('scan-box');
   scanBox.classList.remove('active', 'warn', 'error');
   scanBox.classList.add(status === 'ok' ? 'active' : (status === 'duplicate' ? 'warn' : 'error'));
   setTimeout(() => scanBox.classList.remove('active', 'warn', 'error'), 450);
 
-  // Exibe Feedback Toast (cor/texto variam por status)
   showFeedback(id, status);
 
-  // Só soma ao total de "encontrados" únicos se não for duplicado —
-  // duplicado não deve inflar a acuracidade nem esconder pendências.
   if (!alreadyFound) S.found.push(id);
 
-  // Todo evento de leitura vai pro log, inclusive duplicados/missorts,
-  // para rastreabilidade total da operação.
   S.logs.unshift({ id: id, time: new Date().toLocaleTimeString(), zone: S.activeZone, status: status });
   save();
 
@@ -573,8 +599,6 @@ function showFeedback(id, status) {
 ═══════════════════════════════════════════ */
 function playBeep(status = 'ok') {
   if (!audioCtx) return;
-  // Bipe único e agudo para OK; dois tons para duplicado/missort,
-  // para o operador distinguir sem precisar olhar a tela.
   const tones = status === 'ok' ? [1000] : status === 'duplicate' ? [700, 700] : [420, 300];
 
   tones.forEach((freq, i) => {
@@ -657,7 +681,7 @@ function renderInventoryList() {
   if (!container) return;
 
   if (!S.idsToFind || S.idsToFind.length === 0) {
-    container.innerHTML = `<p style="font-size:13px; color:var(--text-3)">
+    container.innerHTML = `<p style="font-size:12px; color:var(--text-3)">
       Nenhuma lista carregada ainda. Importe uma planilha na aba "Operação" para
       acompanhar pendentes, bipados e itens fora da lista.
     </p>`;
@@ -739,7 +763,7 @@ function renderLogs() {
     <div class="log-item">
       <span class="log-id">${l.id}</span>
       <span class="status-chip ${chipClass}">${chipLabel}</span>
-      <span style="font-size:12px; color:var(--text-3)">${l.zone} - ${l.time}</span>
+      <span style="font-size:11px; color:var(--text-3)">${l.zone} - ${l.time}</span>
     </div>`;
   }).join('');
 }
@@ -773,3 +797,5 @@ function clearSession() {
 </script>
 </body>
 </html>
+
+```
