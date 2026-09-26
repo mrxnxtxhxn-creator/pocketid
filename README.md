@@ -15,25 +15,25 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:         #080C14;
+  --bg:          #080C14;
   --surface-0: #0D1421;
   --surface-1: #111827;
   --surface-2: #1A2336;
   --surface-3: #243049;
-  --border:     rgba(255,255,255,0.07);
+  --border:      rgba(255,255,255,0.07);
   --border-hi:  rgba(255,255,255,0.14);
-  --accent:     #3B82F6;
+  --accent:      #3B82F6;
   --accent-lo:  rgba(59,130,246,0.12);
   --accent-hi:  #60A5FA;
   --green:      #10B981;
-  --green-lo:   rgba(16,185,129,0.12);
+  --green-lo:    rgba(16,185,129,0.12);
   --red:        #EF4444;
-  --red-lo:     rgba(239,68,68,0.12);
-  --yellow:     #F59E0B;
+  --red-lo:      rgba(239,68,68,0.12);
+  --yellow:      #F59E0B;
   --yellow-lo:  rgba(245,158,11,0.12);
-  --text-1:     #F1F5F9;
-  --text-2:     #94A3B8;
-  --text-3:     #475569;
+  --text-1:      #F1F5F9;
+  --text-2:      #94A3B8;
+  --text-3:      #475569;
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', system-ui, sans-serif;
 }
@@ -157,6 +157,34 @@ html, body {
   display: flex;
   flex-direction: row; /* Layout horizontal: Menu Lateral + Conteúdo */
   overflow: hidden;
+  transition: max-height 0.25s ease, min-height 0.25s ease, flex 0.25s ease;
+}
+
+/* ESTADO FECHADO/RECOLHIDO DO PAINEL */
+#main-panel.collapsed {
+  min-height: 52px;
+  max-height: 52px;
+  flex: 0 0 52px;
+}
+
+#main-panel.collapsed .tab-content-container {
+  display: none !important;
+}
+
+#main-panel.collapsed .tab-row {
+  flex-direction: row;
+  width: 100%;
+  min-width: 100%;
+  border-right: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 12px;
+  align-items: center;
+}
+
+#main-panel.collapsed .tab-pill {
+  width: auto;
+  white-space: nowrap;
 }
 
 /* MENU LATERAL */
@@ -171,6 +199,7 @@ html, body {
   min-width: 190px;
   flex-shrink: 0;
   overflow-y: auto;
+  transition: all 0.2s ease;
 }
 
 .tab-pill {
@@ -682,23 +711,36 @@ function downloadExcel() {
 }
 
 /* ═══════════════════════════════════════════
-   INTERFACE & NAVEGAÇÃO
+   INTERFACE & NAVEGAÇÃO / TOGGLE MENU
 ═══════════════════════════════════════════ */
 function switchTab(tabName, el) {
+  const mainPanel = document.getElementById('main-panel');
+  
+  let targetBtn = el;
+  if (!targetBtn) {
+    const btnMap = { scan:0, listas:1, zonas:2, dash:3, log:4, perfil:5 };
+    const idx = btnMap[tabName];
+    if (idx !== undefined) targetBtn = document.querySelectorAll('.tab-pill')[idx];
+  }
+
+  const isAlreadyActive = targetBtn && targetBtn.classList.contains('active');
+
+  // Clicar na aba já selecionada alterna entre abrir e fechar o painel
+  if (isAlreadyActive) {
+    mainPanel.classList.toggle('collapsed');
+    return;
+  }
+
+  // Clicar em uma nova aba sempre abre o painel de conteúdo
+  mainPanel.classList.remove('collapsed');
+
   document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  if (el) {
-    el.classList.add('active');
-  } else {
-    // Caso a troca venha de fora (ex: avatar do topo)
-    const btnMap = { scan:0, listas:1, zonas:2, dash:3, log:4, perfil:5 };
-    const idx = btnMap[tabName];
-    if (idx !== undefined) document.querySelectorAll('.tab-pill')[idx].classList.add('active');
-  }
+  if (targetBtn) targetBtn.classList.add('active');
 
-  const target = document.getElementById(`view-${tabName}`);
-  if (target) target.classList.add('active');
+  const targetView = document.getElementById(`view-${tabName}`);
+  if (targetView) targetView.classList.add('active');
 }
 
 function renderZones() {
