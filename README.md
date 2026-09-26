@@ -1,18 +1,3 @@
-Aqui está o código ajustado para telas de **notebook/laptop** (resoluções como 1366x768 ou 1920x1080 em telas de 13" a 15.6"):
-
-### Principais alterações aplicadas:
-
-1. **Redimensionamento Proporcional Flexível**: Remoção da altura fixa de `380px` do `#main-panel`. Agora ele usa `flex: 1 1 50%` com `max-height: 55vh`, permitindo que o viewport do leitor e o painel inferior dividam a tela sem cortar nada.
-2. **Compactação Visual para Telas Baixas**:
-* Diminuição dos paddings no `.scanner-box`, botões, campos de texto e `.top-bar`.
-* Ajuste nas fontes do visor principal (`.last-scan-display`) e ícone do leitor para caberem confortavelmente em telas com altura vertical reduzida.
-
-
-3. **Media Queries para Telas de 768px ou Menores**: Adicionada regra `@media (max-height: 768px)` que reduz os tamanhos dos elementos automaticamente quando a janela do navegador estiver minimizada ou em displays menores.
-4. **Grid Responsiva**: A `.kpi-grid` agora se ajusta automaticamente (`minmax(130px, 1fr)`), evitando quebrar linhas de forma desconectada.
-5. **Scroll Interno Protegido**: Garantia de que a barra de abas (`.tab-row`) e o container de conteúdo tenham rolagens independentes sem empurrar o cabeçalho para fora do visor.
-
-```html
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
