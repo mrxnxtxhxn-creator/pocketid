@@ -93,7 +93,7 @@ html, body {
 /* ── TELA CENTRAL DE BIPAGEM ZEBRA ── */
 #zebra-viewport {
   flex: 1 1 auto;
-  min-height: 180px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -108,9 +108,9 @@ html, body {
   background: var(--surface-1);
   border: 2px dashed var(--accent);
   border-radius: 18px;
-  padding: 20px 30px;
+  padding: 18px 28px;
   text-align: center;
-  max-width: 460px;
+  max-width: 440px;
   width: 100%;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   transition: all 0.2s;
@@ -132,9 +132,9 @@ html, body {
 }
 
 .scanner-icon {
-  font-size: 36px;
+  font-size: 34px;
   color: var(--accent);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .last-scan-display {
@@ -142,12 +142,12 @@ html, body {
   font-size: 22px;
   font-weight: 700;
   color: var(--green);
-  margin-top: 6px;
+  margin-top: 4px;
   word-break: break-all;
-  min-height: 30px;
+  min-height: 28px;
 }
 
-/* ── PAINEL DE CONTROLE / TABS ── */
+/* ── PAINEL DE CONTROLE / SIDEBAR LATERAL ── */
 #main-panel {
   flex: 1 1 50%;
   min-height: 250px;
@@ -155,28 +155,62 @@ html, body {
   background: var(--surface-1);
   border-top: 1px solid var(--border);
   display: flex;
-  flex-direction: column;
+  flex-direction: row; /* Layout horizontal: Menu Lateral + Conteúdo */
   overflow: hidden;
 }
 
+/* MENU LATERAL */
 .tab-row {
-  display: flex; gap: 6px; padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-right: 1px solid var(--border);
   background: var(--surface-0);
-  overflow-x: auto;
+  width: 190px;
+  min-width: 190px;
   flex-shrink: 0;
-}
-.tab-pill {
-  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600;
-  color: var(--text-2); cursor: pointer; border: 1px solid var(--border);
-  background: transparent; transition: all .15s; white-space: nowrap;
-}
-.tab-pill.active {
-  background: var(--accent); color: white; border-color: var(--accent);
+  overflow-y: auto;
 }
 
+.tab-pill {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: all .15s;
+  white-space: nowrap;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tab-pill i {
+  font-size: 16px;
+}
+
+.tab-pill:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.tab-pill.active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+/* CONTAINER DE CONTEÚDO */
 .tab-content-container {
-  flex: 1; overflow-y: auto; padding: 16px 20px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
 }
 .tab-content { display: none; }
 .tab-content.active { display: block; animation: fadeUp .2s ease; }
@@ -208,7 +242,7 @@ html, body {
 }
 .upload-card:hover { border-color: var(--accent); background: var(--accent-lo); }
 
-/* KPI Grid Ajustado para Notebook */
+/* KPI Grid Ajustado */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .kpi-card { background: var(--surface-0); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .kpi-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; margin-bottom: 4px; }
@@ -236,15 +270,16 @@ html, body {
 }
 .log-id { font-family: var(--mono); font-size: 13px; font-weight: 600; }
 
-/* ── MEDIA QUERIES PARA NOTEBOOK / TELA REDUZIDA ── */
+/* ── MEDIA QUERIES PARA NOTEBOOK ── */
 @media (max-height: 768px) {
   #top-bar { padding: 8px 16px; }
-  #zebra-viewport { padding: 10px; min-height: 140px; }
-  .scanner-box { padding: 14px 20px; max-width: 380px; }
-  .scanner-icon { font-size: 28px; margin-bottom: 2px; }
+  #zebra-viewport { padding: 10px; min-height: 130px; }
+  .scanner-box { padding: 12px 18px; max-width: 380px; }
+  .scanner-icon { font-size: 26px; margin-bottom: 2px; }
   .scanner-box h3 { font-size: 14px !important; }
-  .last-scan-display { font-size: 18px; min-height: 24px; margin-top: 2px; }
-  .tab-row { padding: 8px 12px; }
+  .last-scan-display { font-size: 18px; min-height: 22px; margin-top: 2px; }
+  .tab-row { width: 170px; min-width: 170px; padding: 8px; }
+  .tab-pill { padding: 8px 10px; font-size: 12px; }
   .tab-content-container { padding: 12px 16px; }
 }
 
@@ -324,15 +359,30 @@ html, body {
 
   <!-- PANELS & TABS -->
   <div id="main-panel">
+    
+    <!-- MENU LATERAL (SIDEBAR) -->
     <div class="tab-row">
-      <button class="tab-pill active" onclick="switchTab('scan', this)">Operação</button>
-      <button class="tab-pill" onclick="switchTab('listas', this)">Listas</button>
-      <button class="tab-pill" onclick="switchTab('zonas', this)">Zonas</button>
-      <button class="tab-pill" onclick="switchTab('dash', this)">Dashboard KPI</button>
-      <button class="tab-pill" onclick="switchTab('log', this)">Log Histórico</button>
-      <button class="tab-pill" onclick="switchTab('perfil', this)">Perfil</button>
+      <button class="tab-pill active" onclick="switchTab('scan', this)">
+        <i class="ri-scan-2-line"></i> Operação
+      </button>
+      <button class="tab-pill" onclick="switchTab('listas', this)">
+        <i class="ri-list-check-2"></i> Listas
+      </button>
+      <button class="tab-pill" onclick="switchTab('zonas', this)">
+        <i class="ri-map-pin-2-line"></i> Zonas
+      </button>
+      <button class="tab-pill" onclick="switchTab('dash', this)">
+        <i class="ri-dashboard-3-line"></i> Dashboard KPI
+      </button>
+      <button class="tab-pill" onclick="switchTab('log', this)">
+        <i class="ri-history-line"></i> Log Histórico
+      </button>
+      <button class="tab-pill" onclick="switchTab('perfil', this)">
+        <i class="ri-user-3-line"></i> Perfil
+      </button>
     </div>
 
+    <!-- CONTEÚDO DA ABA ATIVA -->
     <div class="tab-content-container">
 
       <!-- SCAN / OPERAÇÃO TAB -->
@@ -462,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') scanManual(); 
   });
 
-  // Inicializa o Áudio do Navegador para os bippes
   document.body.addEventListener('click', () => {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }, { once: true });
@@ -484,7 +533,7 @@ function bootApp() {
 }
 
 /* ═══════════════════════════════════════════
-   INTEGRAÇÃO COM LEITOR ZEBRA DSS22 (KEYBOARD WEDGE)
+   INTEGRAÇÃO COM LEITOR ZEBRA DSS22
 ═══════════════════════════════════════════ */
 let zebraBuffer = '';
 let zebraTimer = null;
@@ -639,7 +688,15 @@ function switchTab(tabName, el) {
   document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+  } else {
+    // Caso a troca venha de fora (ex: avatar do topo)
+    const btnMap = { scan:0, listas:1, zonas:2, dash:3, log:4, perfil:5 };
+    const idx = btnMap[tabName];
+    if (idx !== undefined) document.querySelectorAll('.tab-pill')[idx].classList.add('active');
+  }
+
   const target = document.getElementById(`view-${tabName}`);
   if (target) target.classList.add('active');
 }
@@ -782,5 +839,3 @@ function clearSession() {
 </script>
 </body>
 </html>
-
-```
